@@ -19,6 +19,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ITMT Management System",
   description: "ITMT Academy Management System",
+  icons: {
+    icon: "/newLogo.png",
+  },
 };
 
 export default function RootLayout({

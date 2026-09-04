@@ -1,17 +1,24 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { ArrowRight, GraduationCap } from "lucide-react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  GraduationCap,
+} from "lucide-react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import Image from "next/image";
 
 export default function StudentLoginPage() {
   const router = useRouter();
 
   const [matricNumber, setMatricNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -74,10 +81,10 @@ export default function StudentLoginPage() {
                 >
                   <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl">
                     <img
-                      src="/newLog.png"
-                      alt="ITMT Academy"
-                      className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-95"
-                    />
+  src="/newLog.png"
+  alt="ITMT Academy"
+  className="h-full w-full object-contain"
+/>
 
                     <span className="absolute bottom-0 left-1/2 h-0.5 w-0 -translate-x-1/2 bg-brand-gold transition-all duration-300 group-hover:w-7" />
                   </div>
@@ -186,36 +193,51 @@ export default function StudentLoginPage() {
                 </div>
 
                 {/* Password */}
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <label
-                      htmlFor="password"
-                      className="block text-sm font-medium text-slate-700"
-                    >
-                      Password
-                    </label>
+                {/* Password */}
+<div>
+  <div className="mb-2 flex items-center justify-between">
+    <label
+      htmlFor="password"
+      className="block text-sm font-medium text-slate-700"
+    >
+      Password
+    </label>
 
-                    <Link
-                      href="/auth/forgot-password"
-                      className="text-xs font-medium text-brand-navy transition-colors hover:text-brand-blue"
-                    >
-                      Forgot password?
-                    </Link>
-                  </div>
+    <Link
+      href="/auth/forgot-password"
+      className="text-xs font-medium text-brand-navy transition-colors hover:text-brand-blue"
+    >
+      Forgot password?
+    </Link>
+  </div>
 
-                  <input
-                    id="password"
-                    type="password"
-                    required
-                    autoComplete="current-password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) =>
-                      setPassword(e.target.value)
-                    }
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-navy focus:bg-white focus:ring-4 focus:ring-brand-navy/5"
-                  />
-                </div>
+  <div className="relative">
+    <input
+      id="password"
+      type={showPassword ? "text" : "password"}
+      required
+      autoComplete="current-password"
+      placeholder="Enter your password"
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+      className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 pr-12 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-navy focus:bg-white focus:ring-4 focus:ring-brand-navy/5"
+    />
+
+    <button
+      type="button"
+      onClick={() => setShowPassword((prev) => !prev)}
+      className="absolute right-0 top-0 flex h-12 w-12 items-center justify-center text-slate-400 transition-colors hover:text-brand-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-navy"
+      aria-label={showPassword ? "Hide password" : "Show password"}
+      title={showPassword ? "Hide password" : "Show password"}
+    >
+      {showPassword ? (
+        <EyeOff className="h-5 w-5" />
+      ) : (
+        <Eye className="h-5 w-5" />
+      )}
+    </button>
+  </div>
+</div>
 
                 {/* Submit */}
                 <button

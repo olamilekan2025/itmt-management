@@ -1,4 +1,3 @@
-
 import { DefaultSession } from "next-auth";
 
 import "next-auth";
@@ -41,11 +40,13 @@ declare module "next-auth" {
     /**
      * Backend Express JWT.
      *
-     * This is the token returned by:
+     * The backend token is exposed here:
      *
-     * POST /auth/login
-     * POST /auth/student/login
-     * POST /auth/oauth-login
+     * session.accessToken
+     *
+     * It is NOT:
+     *
+     * session.user.accessToken
      */
     accessToken: string;
   }
@@ -65,4 +66,3 @@ declare module "next-auth/jwt" {
     matricNumber?: string;
   }
 }
-

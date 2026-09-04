@@ -1,26 +1,7 @@
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-
-const uploadDir = path.join(process.cwd(), "uploads", "passports");
-
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname);
-    cb(null, `passport-${uniqueSuffix}${ext}`);
-  },
-});
 
 function fileFilter(
-  _req: Express.Request,
+  _req: any,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback,
 ) {
@@ -33,7 +14,14 @@ function fileFilter(
 }
 
 export const uploadPassportPhoto = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
 }).single("passportPhoto");
+
+
+export const uploadHeroImage = multer({
+  storage: multer.memoryStorage(),
+  fileFilter,
+  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB, hero images are typically larger than passport photos
+}).single("image");

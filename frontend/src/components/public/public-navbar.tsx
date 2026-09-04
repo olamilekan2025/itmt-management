@@ -37,7 +37,7 @@ export default function PublicNavbar() {
         >
           <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl shadow-sm">
             <Image
-              src="/logo.png"
+              src="/newLogo.png"
               alt="ITMT logo"
               fill
               sizes="40px"

@@ -5,9 +5,16 @@ import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+} from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+
 
 function GoogleIcon() {
   return (
@@ -52,6 +59,7 @@ export default function AuthPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
 
@@ -312,8 +320,8 @@ export default function AuthPage() {
             {resendState === "sending"
               ? "Sending new code..."
               : resendState === "sent"
-              ? "New code sent — resend again"
-              : "Didn't get a code? Resend"}
+                ? "New code sent — resend again"
+                : "Didn't get a code? Resend"}
           </button>
 
           <button
@@ -365,10 +373,12 @@ export default function AuthPage() {
             className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-navy focus:bg-white focus:ring-4 focus:ring-brand-navy/5"
           />
         </div>
-
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-slate-700"
+            >
               Password
             </label>
 
@@ -380,16 +390,32 @@ export default function AuthPage() {
             </Link>
           </div>
 
-          <input
-            id="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-navy focus:bg-white focus:ring-4 focus:ring-brand-navy/5"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              required
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 pr-12 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-brand-navy focus:bg-white focus:ring-4 focus:ring-brand-navy/5"
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-0 top-0 flex h-12 w-12 items-center justify-center text-slate-400 transition-colors hover:text-brand-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-navy"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? (
+                <EyeOff className="h-5 w-5" />
+              ) : (
+                <Eye className="h-5 w-5" />
+              )}
+            </button>
+          </div>
         </div>
 
         <button
@@ -455,13 +481,11 @@ export default function AuthPage() {
                   aria-label="Back to Home"
                   className="group relative flex h-16 w-16 items-center overflow-hidden rounded-2xl bg-white p-2 shadow-lg transition-all duration-300 hover:w-44 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold focus-visible:ring-offset-2 focus-visible:ring-offset-brand-navy"
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl">
-                    <img
-                      src="/newLog.png"
-                      alt="ITMT Academy"
-                      className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-95"
-                    />
-                  </div>
+                  <img
+                    src="/newLog.png"
+                    alt="ITMT Academy"
+                    className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-95"
+                  />
 
                   <span className="ml-3 whitespace-nowrap text-sm font-semibold text-brand-navy opacity-0 transition-all duration-300 group-hover:opacity-100">
                     Back to Home

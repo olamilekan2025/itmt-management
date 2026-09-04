@@ -1,10 +1,18 @@
 import type { NextAuthOptions } from "next-auth";
+
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
+
 import { z } from "zod";
 
 import type { UserRole } from "./types/next-auth";
+
+/**
+ * =========================================================
+ * LOGIN VALIDATION
+ * =========================================================
+ */
 
 const loginSchema = z.object({
   email: z
@@ -28,13 +36,13 @@ const loginSchema = z.object({
     .optional(),
 });
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 /**
  * =========================================================
  * API URL
  * =========================================================
  */
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 function getApiUrl(): string {
   if (!API_URL) {
@@ -48,7 +56,7 @@ function getApiUrl(): string {
 
 /**
  * =========================================================
- * AUTH OPTIONS
+ * NEXT-AUTH OPTIONS
  * =========================================================
  */
 
@@ -57,19 +65,25 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
 
+  /**
+   * =======================================================
+   * PROVIDERS
+   * =======================================================
+   */
+
   providers: [
     /**
-     * =======================================================
-     * CREDENTIALS LOGIN
-     * =======================================================
+     * =====================================================
+     * CREDENTIALS
+     * =====================================================
      *
-     * Handles:
+     * Supports:
      *
-     * 1. Student login
-     *    matricNumber + password
+     * Student:
+     * matricNumber + password
      *
-     * 2. Admin/staff login
-     *    email + password + optional OTP
+     * Staff:
+     * email + password + optional OTP
      */
 
     CredentialsProvider({
@@ -98,9 +112,6 @@ export const authOptions: NextAuthOptions = {
       },
 
       async authorize(credentials) {
-        /**
-         * Validate credentials before doing anything.
-         */
         const parsed = loginSchema.safeParse(credentials);
 
         if (!parsed.success) {
@@ -121,10 +132,6 @@ export const authOptions: NextAuthOptions = {
            * =================================================
            * STUDENT LOGIN
            * =================================================
-           *
-           * Students use:
-           *
-           * matric number + password
            */
 
           if (matricNumber) {
@@ -141,8 +148,7 @@ export const authOptions: NextAuthOptions = {
                 },
 
                 body: JSON.stringify({
-                  matricNumber:
-                    normalizedMatricNumber,
+                  matricNumber: normalizedMatricNumber,
                   password,
                 }),
 
@@ -156,10 +162,6 @@ export const authOptions: NextAuthOptions = {
 
             const data = await response.json();
 
-            /**
-             * Make sure the backend returned
-             * the information we need.
-             */
             if (
               !data?.user?.id ||
               !data?.user?.role ||
@@ -197,15 +199,12 @@ export const authOptions: NextAuthOptions = {
            * =================================================
            * ADMIN / STAFF LOGIN
            * =================================================
-           *
-           * Admin, Registrar, Finance and Lecturer use:
-           *
-           * email + password
-           *
-           * OTP is included when supplied.
            */
 
           if (email) {
+            const normalizedEmail =
+              email.trim().toLowerCase();
+
             const response = await fetch(
               `${apiUrl}/auth/login`,
               {
@@ -216,11 +215,9 @@ export const authOptions: NextAuthOptions = {
                 },
 
                 body: JSON.stringify({
-                  email: email.trim().toLowerCase(),
+                  email: normalizedEmail,
                   password,
-                  ...(otp
-                    ? { otp }
-                    : {}),
+                  ...(otp ? { otp } : {}),
                 }),
 
                 cache: "no-store",
@@ -233,10 +230,6 @@ export const authOptions: NextAuthOptions = {
 
             const data = await response.json();
 
-            /**
-             * Make sure the backend returned
-             * the information we need.
-             */
             if (
               !data?.user?.id ||
               !data?.user?.role ||
@@ -255,11 +248,11 @@ export const authOptions: NextAuthOptions = {
 
               name:
                 data.user.name ||
-                email,
+                normalizedEmail,
 
               email:
                 data.user.email ||
-                email,
+                normalizedEmail,
 
               role: data.user.role as UserRole,
 
@@ -280,9 +273,9 @@ export const authOptions: NextAuthOptions = {
     }),
 
     /**
-     * =======================================================
+     * =====================================================
      * GOOGLE
-     * =======================================================
+     * =====================================================
      */
 
     GoogleProvider({
@@ -294,9 +287,9 @@ export const authOptions: NextAuthOptions = {
     }),
 
     /**
-     * =======================================================
+     * =====================================================
      * FACEBOOK
-     * =======================================================
+     * =====================================================
      */
 
     FacebookProvider({
@@ -319,8 +312,6 @@ export const authOptions: NextAuthOptions = {
      * =======================================================
      * JWT CALLBACK
      * =======================================================
-     *
-     * The backend JWT is stored inside NextAuth's JWT.
      */
 
     async jwt({
@@ -329,9 +320,7 @@ export const authOptions: NextAuthOptions = {
       account,
     }) {
       /**
-       * =====================================================
-       * CREDENTIALS LOGIN
-       * =====================================================
+       * Credentials login
        */
 
       if (
@@ -354,14 +343,8 @@ export const authOptions: NextAuthOptions = {
 
       /**
        * =====================================================
-       * GOOGLE / FACEBOOK LOGIN
+       * GOOGLE / FACEBOOK
        * =====================================================
-       *
-       * NextAuth authenticates the social account first.
-       *
-       * We then exchange that social identity with
-       * our Express backend so our application gets
-       * its own JWT.
        */
 
       if (
@@ -451,12 +434,9 @@ export const authOptions: NextAuthOptions = {
      * SESSION CALLBACK
      * =======================================================
      *
-     * Exposes the backend JWT as:
+     * Backend JWT becomes:
      *
      * session.accessToken
-     *
-     * This is what your apiGet/apiPost/apiPatch helpers
-     * will use for Authorization: Bearer <token>.
      */
 
     async session({
@@ -484,9 +464,9 @@ export const authOptions: NextAuthOptions = {
       }
 
       /**
-       * Only set accessToken when it actually
-       * exists in the JWT.
+       * Backend JWT
        */
+
       if (token.accessToken) {
         session.accessToken =
           String(
@@ -500,7 +480,7 @@ export const authOptions: NextAuthOptions = {
 
   /**
    * =========================================================
-   * CUSTOM AUTH PAGES
+   * CUSTOM AUTH PAGE
    * =========================================================
    */
 
@@ -508,4 +488,3 @@ export const authOptions: NextAuthOptions = {
     signIn: "/auth/login",
   },
 };
-

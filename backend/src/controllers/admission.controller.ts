@@ -12,6 +12,7 @@ import { generateVerificationToken, hashToken } from "../utils/token.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
 import { notifyAdmins } from "../services/notification.service.js";
 import type { AuthRequest } from "../middleware/auth.middleware.js";
+import { uploadBufferToCloudinary } from "../utils/uploadToCloudinary.js";
 
 const refereeSchema = z.object({
   name: z.string().trim().min(1),
@@ -132,10 +133,12 @@ export async function applyForAdmission(req: Request, res: Response) {
       return res.status(409).json({ success: false, message: "An application with this email for the selected session already exists." });
     }
 
+      const uploadResult = await uploadBufferToCloudinary(req.file.buffer, "itmt/passports");
+
     const documents = [
       {
         filename: req.file.originalname,
-        url: `/uploads/passports/${req.file.filename}`,
+        url: uploadResult.secure_url,
       },
     ];
 

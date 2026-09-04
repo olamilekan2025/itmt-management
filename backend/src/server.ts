@@ -1,8 +1,9 @@
+import "dotenv/config";
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import dotenv from "dotenv";
 
 import { connectDatabase } from "./config/database.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -21,22 +22,33 @@ import admissionsRoutes from "./routes/admissions.routes.js";
 import path from "path";
 import contactRoutes from "./routes/contact.routes.js";
 import studentRoutes from "./routes/student.routes.js";
-import transcriptRequestRoutes from "./routes/transcript-request.routes";
+import transcriptRequestRoutes from "./routes/transcript-request.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import announcementRoutes from "./routes/announcement.routes.js";
 import academicReportRoutes from "./routes/academic-report.routes.js";
 import auditLogRoutes from "./routes/auditLog.routes.js";
-
-dotenv.config();
+import heroSlideRoutes from "./routes/heroSlide.routes.js";
+import feeCategoryRoutes from "./routes/feeCategory.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(helmet());
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:3000",
+].filter(Boolean) as string[];
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   }),
 );
@@ -45,9 +57,6 @@ app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Authentication endpoints:
-// POST /api/auth/register
-// POST /api/auth/login
 app.use("/api/auth", authRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/programmes", programmeRoutes);
@@ -63,15 +72,14 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/admissions", admissionsRoutes);
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/api/contact", contactRoutes);
-app.use("/api/students", studentRoutes,);
-app.use("/api/transcript-requests", transcriptRequestRoutes,);
-app.use("/api/notifications", notificationRoutes,);
-app.use("/api/announcements", announcementRoutes,);
-app.use("/api/academic-reports", academicReportRoutes,);
-app.use(
-  "/api/audit-logs",
-  auditLogRoutes,
-);
+app.use("/api/students", studentRoutes);
+app.use("/api/transcript-requests", transcriptRequestRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/announcements", announcementRoutes);
+app.use("/api/academic-reports", academicReportRoutes);
+app.use("/api/audit-logs", auditLogRoutes);
+app.use("/api/hero-slides", heroSlideRoutes);
+app.use("/api/fee-categories", feeCategoryRoutes);
 
 app.get("/api/health", (_req, res) => {
   res.status(200).json({

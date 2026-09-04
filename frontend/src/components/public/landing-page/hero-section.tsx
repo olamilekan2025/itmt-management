@@ -5,66 +5,98 @@ import Image from "next/image";
 import Link from "next/link";
 
 interface Slide {
-  image: string;
+  _id: string;
+  imageUrl: string;
   eyebrow: string;
   headline: string;
   subtext: string;
 }
 
-const SLIDES: Slide[] = [
-  {
-    image: "/images/itmt-hero1.png",
-    eyebrow: "Institute of Transport and Management Technology",
-    headline:
-      "Empowering the future of transport and management through education.",
-    subtext:
-      "A modern academic environment built to connect students, lecturers, and administrators through a smarter digital experience.",
-  },
-  {
-    image: "",
-    eyebrow: "Academic Excellence",
-    headline:
-      "Building knowledge, skills, and professionals for a changing world.",
-    subtext:
-      "ITMT provides an environment where students can develop the academic knowledge and practical skills needed to succeed in transport, management, and related fields.",
-  },
-  {
-    image: "/images/itmt-hero3.png",
-    eyebrow: "Connected Education",
-    headline:
-      "One institution. One connected academic experience.",
-    subtext:
-      "From admissions and course registration to academic records and student services, ITMT brings essential institutional processes together in one place.",
-  },
-];
-
 const SLIDE_DURATION = 8000;
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 export default function HeroSection() {
+  const [slides, setSlides] = useState<Slide[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!API_URL) {
+      console.error("NEXT_PUBLIC_API_URL is not configured.");
+      setSlides([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const loadSlides = async () => {
+      try {
+        const response = await fetch(`${API_URL}/hero-slides`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch hero slides: ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+
+        setSlides(Array.isArray(data.slides) ? data.slides : []);
+      } catch (error) {
+        console.error("Failed to load hero slides:", error);
+        setSlides([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSlides();
+  }, []);
+
+  useEffect(() => {
+    if (slides.length < 2) return;
+
     const interval = setInterval(() => {
-      setActiveIndex((current) => (current + 1) % SLIDES.length);
+      setActiveIndex((current) => (current + 1) % slides.length);
     }, SLIDE_DURATION);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [slides.length]);
 
-  const active = SLIDES[activeIndex];
+  if (isLoading) {
+    return (
+      <section
+        className="h-[640px] bg-brand-navy md:h-[600px]"
+        aria-label="Loading hero"
+      />
+    );
+  }
+
+  if (slides.length === 0) {
+    return (
+      <section className="flex h-[640px] items-center justify-center bg-brand-navy md:h-[600px]">
+        <p className="text-white/60">Welcome to ITMT.</p>
+      </section>
+    );
+  }
+
+  const active = slides[activeIndex];
 
   return (
     <section className="relative h-[640px] overflow-hidden bg-brand-navy md:h-[600px]">
       {/* Background images */}
-      {SLIDES.map((slide, index) => (
+      {slides.map((slide, index) => (
         <div
-          key={slide.image}
+          key={slide._id}
           className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
             index === activeIndex ? "opacity-100" : "opacity-0"
           }`}
+          aria-hidden={index !== activeIndex}
         >
           <Image
-            src={slide.image}
+            src={slide.imageUrl}
             alt=""
             fill
             priority={index === 0}
@@ -86,7 +118,6 @@ export default function HeroSection() {
       {/* Hero content */}
       <div className="relative flex h-full items-center">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-center px-6 text-center">
-          {/* Main content */}
           <div className="flex w-full max-w-4xl flex-col items-center">
             <p
               key={`eyebrow-${activeIndex}`}
@@ -109,7 +140,6 @@ export default function HeroSection() {
               {active.subtext}
             </p>
 
-            {/* Actions */}
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <Link
                 href="/auth/login"
@@ -127,25 +157,30 @@ export default function HeroSection() {
             </div>
           </div>
 
-          {/* Slide indicators */}
-          <div className="mt-16 flex items-center justify-center gap-2">
-            {SLIDES.map((slide, index) => (
-              <button
-                key={slide.image}
-                type="button"
-                aria-label={`Show slide ${index + 1}`}
-                aria-current={index === activeIndex ? "true" : undefined}
-                onClick={() => setActiveIndex(index)}
-                className={`h-1.5 rounded-full transition-all duration-500 ${
-                  index === activeIndex
-                    ? "w-8 bg-brand-gold"
-                    : "w-1.5 bg-white/30 hover:bg-white/50"
-                }`}
-              />
-            ))}
-          </div>
+          {/* Slide controls */}
+          {slides.length > 1 && (
+            <div className="mt-16 flex items-center justify-center gap-2">
+              {slides.map((slide, index) => (
+                <button
+                  key={slide._id}
+                  type="button"
+                  aria-label={`Show slide ${index + 1}`}
+                  aria-current={
+                    index === activeIndex ? "true" : undefined
+                  }
+                  onClick={() => setActiveIndex(index)}
+                  className={`h-1.5 rounded-full transition-all duration-500 ${
+                    index === activeIndex
+                      ? "w-8 bg-brand-gold"
+                      : "w-1.5 bg-white/30 hover:bg-white/50"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>
   );
 }
+

@@ -23,6 +23,7 @@ import {
   UserRound,
   X,
   Building2,
+  ImageIcon,
 } from "lucide-react";
 
 type AdminSidebarProps = {
@@ -133,8 +134,7 @@ const navigationSections: NavigationSection[] = [
         href: "/dashboards/admin/lecturer-assignments",
         icon: UserCog,
       },
-
-      
+    
     ],
   },
 
@@ -224,6 +224,11 @@ const navigationSections: NavigationSection[] = [
         label: "Settings",
         href: "/dashboards/admin/settings",
         icon: Settings,
+      },
+        {
+        label: "Hero Section",
+        href: "/dashboards/admin/hero-slides",
+        icon: ImageIcon,
       },
     ],
   },
