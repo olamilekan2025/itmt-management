@@ -203,13 +203,113 @@ export async function sendVerificationEmail(
   });
 }
 
+// export async function sendOtpEmail(
+//   to: string,
+//   name: string,
+//   otp: string,
+// ) {
+//   return sendEmail({
+//     to,
+//     subject: "Your ITMT login verification code",
+//     html: `
+//       <div style="
+//         font-family: Arial, sans-serif;
+//         max-width: 600px;
+//         margin: 0 auto;
+//         padding: 32px;
+//         color: #1f2937;
+//       ">
+//         <div style="
+//           background: #0f172a;
+//           color: white;
+//           padding: 24px;
+//           border-radius: 12px 12px 0 0;
+//           text-align: center;
+//         ">
+//           <h1 style="margin: 0; font-size: 24px;">
+//             ITMT Management System
+//           </h1>
+//         </div>
+
+//         <div style="
+//           border: 1px solid #e5e7eb;
+//           border-top: none;
+//           padding: 32px;
+//           border-radius: 0 0 12px 12px;
+//         ">
+//           <h2 style="margin-top: 0;">
+//             Hello ${name},
+//           </h2>
+
+//           <p>
+//             Use the verification code below to complete your login:
+//           </p>
+
+//           <div style="
+//             margin: 28px 0;
+//             padding: 20px;
+//             background: #f8fafc;
+//             border: 1px solid #e2e8f0;
+//             border-radius: 10px;
+//             text-align: center;
+//           ">
+//             <span style="
+//               font-size: 32px;
+//               font-weight: 700;
+//               letter-spacing: 8px;
+//               color: #0f172a;
+//             ">
+//               ${otp}
+//             </span>
+//           </div>
+
+//           <p style="font-size: 14px; color: #64748b;">
+//             This verification code is for your ITMT account login.
+//             Do not share it with anyone.
+//           </p>
+
+//           <p style="font-size: 14px; color: #64748b;">
+//             If you did not attempt to log in, you can safely ignore this email.
+//           </p>
+//         </div>
+
+//         <p style="
+//           text-align: center;
+//           font-size: 12px;
+//           color: #94a3b8;
+//           margin-top: 24px;
+//         ">
+//           © ITMT Management System
+//         </p>
+//       </div>
+//     `,
+//   });
+// }
+
+
+
+
+
+
 export async function sendOtpEmail(
   to: string,
   name: string,
   otp: string,
 ) {
+  // TEMPORARY DEVELOPMENT SETUP:
+  // Resend's testing sender can only send to the
+  // verified/test recipient. Remove this variable
+  // when a real domain is verified in Resend.
+  const otpRecipient = process.env.OTP_TEST_RECIPIENT || to;
+
+  console.log(
+    `Sending login OTP to: ${otpRecipient}${
+      otpRecipient !== to ? ` (actual user email: ${to})` : ""
+    }`,
+  );
+
   return sendEmail({
-    to,
+    to: otpRecipient,
     subject: "Your ITMT login verification code",
     html: `
       <div style="
