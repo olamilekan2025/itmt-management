@@ -14,6 +14,12 @@ import User from "../models/User.js";
 
 import Semester from "../models/Semester.js";
 
+import AcademicSession from "../models/AcademicSession.js";
+
+import Programme from "../models/Programme.js";
+
+import AuditLog from "../models/AuditLog.js";
+
 const objectId = z
   .string()
   .regex(/^[a-f\d]{24}$/i, "Invalid ID");
@@ -23,7 +29,15 @@ const recordPaymentSchema = z.object({
 
   semester: objectId,
 
+  academicSession: objectId.optional(),
+
+  programme: objectId.optional(),
+
+  department: objectId.optional(),
+
   amount: z.number().positive(),
+
+  currency: z.string().default("NGN").optional(),
 
   method: z
     .enum([
@@ -34,11 +48,38 @@ const recordPaymentSchema = z.object({
     ])
     .default("cash"),
 
-  reference: z
-    .string()
-    .trim()
-    .max(100)
-    .optional(),
+  purpose: z
+    .enum([
+      "tuition",
+      "registration",
+      "examination",
+      "acceptance",
+      "transcript",
+      "certificate",
+      "hostel",
+      "other",
+    ])
+    .default("tuition"),
+
+  paymentReference: z.string().trim().min(3).max(50),
+
+  invoiceNumber: z.string().trim().optional(),
+
+  paymentProvider: z.string().trim().optional(),
+
+  providerTransactionRef: z.string().trim().optional(),
+
+  status: z
+    .enum([
+      "pending",
+      "successful",
+      "failed",
+      "refunded",
+      "cancelled",
+    ])
+    .default("successful"),
+
+  notes: z.string().trim().optional(),
 });
 
 /**
@@ -265,6 +306,46 @@ export async function recordPayment(
     }
 
     /**
+     * Verify academic session if provided.
+     */
+    if (data.academicSession) {
+      const session = await AcademicSession.findById(data.academicSession);
+      if (!session) {
+        return res.status(400).json({
+          success: false,
+          message: "Academic session not found",
+        });
+      }
+    }
+
+    /**
+     * Verify programme if provided.
+     */
+    if (data.programme) {
+      const programme = await Programme.findById(data.programme);
+      if (!programme) {
+        return res.status(400).json({
+          success: false,
+          message: "Programme not found",
+        });
+      }
+    }
+
+    /**
+     * Check for duplicate payment reference.
+     */
+    const existingPayment = await Payment.findOne({
+      paymentReference: data.paymentReference.toUpperCase(),
+    });
+
+    if (existingPayment) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment reference already exists",
+      });
+    }
+
+    /**
      * Verify authenticated finance/admin user.
      */
     if (!req.user?.userId) {
@@ -275,24 +356,61 @@ export async function recordPayment(
       });
     }
 
+    const recordingUser = await User.findById(req.user.userId);
+    if (!recordingUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Recording user not found",
+      });
+    }
+
     /**
      * Create payment.
      */
     const payment =
       await Payment.create({
         student: data.student,
-
+        studentName: student.name,
+        matricNumber: student.matricNumber,
         semester: data.semester,
-
+        academicSession: data.academicSession,
+        programme: data.programme,
+        department: data.department,
         amount: data.amount,
-
+        currency: data.currency || "NGN",
         method: data.method,
-
-        reference: data.reference,
-
-        recordedBy:
-          req.user.userId,
+        purpose: data.purpose,
+        paymentReference: data.paymentReference.toUpperCase(),
+        invoiceNumber: data.invoiceNumber,
+        paymentProvider: data.paymentProvider,
+        providerTransactionRef: data.providerTransactionRef,
+        status: data.status,
+        notes: data.notes,
+        recordedBy: req.user.userId,
+        paidAt: data.status === "successful" ? new Date() : undefined,
       });
+
+    /**
+     * Log audit.
+     */
+    await AuditLog.create({
+      actor: req.user.userId,
+      actorName: recordingUser.name,
+      actorEmail: recordingUser.email,
+      actorRole: recordingUser.role,
+      action: "CREATE",
+      module: "PAYMENTS",
+      description: `Recorded payment of ${data.currency || "NGN"} ${data.amount} for student ${student.name}`,
+      targetType: "Payment",
+      targetId: String(payment._id),
+      status: "success",
+      metadata: {
+        studentId: data.student,
+        amount: data.amount,
+        purpose: data.purpose,
+        paymentReference: data.paymentReference,
+      },
+    });
 
     /**
      * Recalculate balance after payment.
@@ -345,11 +463,19 @@ export async function recordPayment(
 }
 
 /**
- * Finance/Admin views payments.
+ * Finance/Admin views payments with filtering and pagination.
  *
- * Optional:
+ * Optional query parameters:
  * ?student=STUDENT_ID
  * ?semester=SEMESTER_ID
+ * ?status=STATUS
+ * ?purpose=PURPOSE
+ * ?method=METHOD
+ * ?search=SEARCH_TERM
+ * ?page=PAGE_NUMBER
+ * ?limit=LIMIT
+ * ?from=START_DATE
+ * ?to=END_DATE
  */
 export async function getPayments(
   req: AuthRequest,
@@ -368,6 +494,68 @@ export async function getPayments(
         ? req.query.semester.trim()
         : undefined;
 
+    const status =
+      typeof req.query.status ===
+      "string"
+        ? req.query.status.trim()
+        : undefined;
+
+    const purpose =
+      typeof req.query.purpose ===
+      "string"
+        ? req.query.purpose.trim()
+        : undefined;
+
+    const method =
+      typeof req.query.method ===
+      "string"
+        ? req.query.method.trim()
+        : undefined;
+
+    const search =
+      typeof req.query.search ===
+      "string"
+        ? req.query.search.trim()
+        : undefined;
+
+    const page = Math.max(
+      1,
+      parseInt(
+        typeof req.query.page === "string"
+          ? req.query.page
+          : "1",
+        10,
+      ),
+    );
+
+    const limit = Math.min(
+      100,
+      Math.max(
+        10,
+        parseInt(
+          typeof req.query.limit === "string"
+            ? req.query.limit
+            : "20",
+          10,
+        ),
+      ),
+    );
+
+    const from =
+      typeof req.query.from ===
+      "string"
+        ? req.query.from.trim()
+        : undefined;
+
+    const to =
+      typeof req.query.to ===
+      "string"
+        ? req.query.to.trim()
+        : undefined;
+
+    /**
+     * Validate IDs.
+     */
     if (
       student &&
       !Types.ObjectId.isValid(student)
@@ -390,6 +578,9 @@ export async function getPayments(
       });
     }
 
+    /**
+     * Build query.
+     */
     const query: Record<
       string,
       unknown
@@ -405,6 +596,72 @@ export async function getPayments(
         new Types.ObjectId(semester);
     }
 
+    if (status) {
+      query.status = status;
+    }
+
+    if (purpose) {
+      query.purpose = purpose;
+    }
+
+    if (method) {
+      query.method = method;
+    }
+
+    /**
+     * Date range filter.
+     */
+    if (from || to) {
+      const dateFilter: Record<string, unknown> = {};
+      if (from) {
+        dateFilter.$gte = new Date(from);
+      }
+      if (to) {
+        dateFilter.$lte = new Date(to);
+      }
+      query.createdAt = dateFilter;
+    }
+
+    /**
+     * Search filter.
+     */
+    if (search) {
+      const searchRegex =
+        new RegExp(
+          escapeRegex(search),
+          "i",
+        );
+
+      query.$or = [
+        {
+          paymentReference: searchRegex,
+        },
+        {
+          studentName: searchRegex,
+        },
+        {
+          matricNumber: searchRegex,
+        },
+        {
+          invoiceNumber: searchRegex,
+        },
+        {
+          providerTransactionRef: searchRegex,
+        },
+      ];
+    }
+
+    /**
+     * Get total count.
+     */
+    const total =
+      await Payment.countDocuments(
+        query,
+      );
+
+    /**
+     * Get payments with pagination.
+     */
     const payments =
       await Payment.find(query)
         .populate(
@@ -416,18 +673,46 @@ export async function getPayments(
           "name order",
         )
         .populate(
+          "academicSession",
+          "name",
+        )
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "department",
+          "name code",
+        )
+        .populate(
           "recordedBy",
+          "name",
+        )
+        .populate(
+          "verifiedBy",
           "name",
         )
         .sort({
           createdAt: -1,
         })
+        .skip((page - 1) * limit)
+        .limit(limit)
         .lean();
+
+    const totalPages =
+      Math.ceil(total / limit);
 
     return res.status(200).json({
       success: true,
 
       payments,
+
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
     });
   } catch (error) {
     console.error(
@@ -1865,6 +2150,144 @@ export async function getFinanceDashboard(
 
       message:
         "Unable to retrieve finance dashboard",
+    });
+  }
+}
+
+/**
+ * Finance/Admin views a specific payment by ID.
+ */
+export async function getPaymentById(
+  req: AuthRequest,
+  res: Response,
+) {
+  try {
+    const { id } = req.params;
+    const paymentId = Array.isArray(id) ? id[0] : id;
+
+    if (!Types.ObjectId.isValid(paymentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment ID",
+      });
+    }
+
+    const payment = await Payment.findById(paymentId)
+      .populate("student", "name email matricNumber programme level")
+      .populate("semester", "name order")
+      .populate("academicSession", "name")
+      .populate("programme", "name code")
+      .populate("department", "name code")
+      .populate("recordedBy", "name email")
+      .populate("verifiedBy", "name email")
+      .lean();
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      payment,
+    });
+  } catch (error) {
+    console.error("Get payment error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to retrieve payment",
+    });
+  }
+}
+
+/**
+ * Finance/Admin verifies a payment.
+ */
+export async function verifyPayment(
+  req: AuthRequest,
+  res: Response,
+) {
+  try {
+    const { id } = req.params;
+    const paymentId = Array.isArray(id) ? id[0] : id;
+
+    if (!Types.ObjectId.isValid(paymentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment ID",
+      });
+    }
+
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authenticated user not found",
+      });
+    }
+
+    const payment = await Payment.findById(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    if (payment.status === "successful") {
+      return res.status(400).json({
+        success: false,
+        message: "Payment is already verified",
+      });
+    }
+
+    const verifyingUser = await User.findById(req.user.userId);
+    if (!verifyingUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Verifying user not found",
+      });
+    }
+
+    payment.status = "successful";
+    payment.verifiedBy = req.user.userId;
+    payment.verifiedAt = new Date();
+    payment.paidAt = new Date();
+
+    await payment.save();
+
+    /**
+     * Log audit.
+     */
+    await AuditLog.create({
+      actor: req.user.userId,
+      actorName: verifyingUser.name,
+      actorEmail: verifyingUser.email,
+      actorRole: verifyingUser.role,
+      action: "APPROVE",
+      module: "PAYMENTS",
+      description: `Verified payment ${payment.paymentReference}`,
+      targetType: "Payment",
+      targetId: String(payment._id),
+      status: "success",
+      metadata: {
+        paymentReference: payment.paymentReference,
+        amount: payment.amount,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment verified successfully",
+      payment,
+    });
+  } catch (error) {
+    console.error("Verify payment error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to verify payment",
     });
   }
 }

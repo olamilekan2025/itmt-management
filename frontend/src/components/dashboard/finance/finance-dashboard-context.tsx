@@ -13,6 +13,8 @@ interface FinanceDashboardContextValue {
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
   toggleSidebar: () => void;
+  mobileOpen: boolean;
+  setMobileOpen: (open: boolean) => void;
 }
 
 const FinanceDashboardContext =
@@ -27,6 +29,7 @@ export function FinanceDashboardProvider({
 }) {
   const [collapsed, setCollapsedState] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -74,8 +77,10 @@ export function FinanceDashboardProvider({
       collapsed,
       setCollapsed,
       toggleSidebar,
+      mobileOpen,
+      setMobileOpen,
     }),
-    [collapsed],
+    [collapsed, mobileOpen],
   );
 
   return (

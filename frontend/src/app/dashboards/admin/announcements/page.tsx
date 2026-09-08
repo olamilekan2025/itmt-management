@@ -49,7 +49,8 @@ type AnnouncementAudience =
   | "everyone"
   | "students"
   | "lecturers"
-  | "staff";
+  | "staff"
+  | "finance";
 
 type AnnouncementStatus =
   | "draft"
@@ -136,11 +137,13 @@ function getAudienceLabel(
     case "staff":
       return "Staff";
 
+    case "finance":
+      return "Finance";
+
     default:
       return audience;
   }
 }
-
 /* =========================================================
    PAGE
 ========================================================= */
@@ -216,7 +219,7 @@ export default function AdminAnnouncementsPage() {
         if (!response.success) {
           throw new Error(
             response.message ||
-              "Unable to load announcements.",
+            "Unable to load announcements.",
           );
         }
 
@@ -274,12 +277,12 @@ export default function AdminAnnouncementsPage() {
           const matchesStatus =
             statusFilter === "all" ||
             announcement.status ===
-              statusFilter;
+            statusFilter;
 
           const matchesAudience =
             audienceFilter === "all" ||
             announcement.audience ===
-              audienceFilter;
+            audienceFilter;
 
           return (
             matchesSearch &&
@@ -407,7 +410,7 @@ export default function AdminAnnouncementsPage() {
         if (!response.success) {
           throw new Error(
             response.message ||
-              "Unable to update announcement.",
+            "Unable to update announcement.",
           );
         }
 
@@ -415,7 +418,7 @@ export default function AdminAnnouncementsPage() {
           setAnnouncements((current) =>
             current.map((item) =>
               item._id ===
-              response.announcement!._id
+                response.announcement!._id
                 ? response.announcement!
                 : item,
             ),
@@ -436,7 +439,7 @@ export default function AdminAnnouncementsPage() {
         if (!response.success) {
           throw new Error(
             response.message ||
-              "Unable to create announcement.",
+            "Unable to create announcement.",
           );
         }
 
@@ -493,7 +496,7 @@ export default function AdminAnnouncementsPage() {
       if (!response.success) {
         throw new Error(
           response.message ||
-            "Unable to publish announcement.",
+          "Unable to publish announcement.",
         );
       }
 
@@ -501,7 +504,7 @@ export default function AdminAnnouncementsPage() {
         setAnnouncements((current) =>
           current.map((item) =>
             item._id ===
-            response.announcement!._id
+              response.announcement!._id
               ? response.announcement!
               : item,
           ),
@@ -549,7 +552,7 @@ export default function AdminAnnouncementsPage() {
       if (!response.success) {
         throw new Error(
           response.message ||
-            "Unable to archive announcement.",
+          "Unable to archive announcement.",
         );
       }
 
@@ -557,7 +560,7 @@ export default function AdminAnnouncementsPage() {
         setAnnouncements((current) =>
           current.map((item) =>
             item._id ===
-            response.announcement!._id
+              response.announcement!._id
               ? response.announcement!
               : item,
           ),
@@ -607,7 +610,7 @@ export default function AdminAnnouncementsPage() {
       if (!response.success) {
         throw new Error(
           response.message ||
-            "Unable to delete announcement.",
+          "Unable to delete announcement.",
         );
       }
 
@@ -736,11 +739,10 @@ export default function AdminAnnouncementsPage() {
               className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
             >
               <RefreshCw
-                className={`h-4 w-4 ${
-                  refreshing
-                    ? "animate-spin"
-                    : ""
-                }`}
+                className={`h-4 w-4 ${refreshing
+                  ? "animate-spin"
+                  : ""
+                  }`}
               />
               Refresh
             </Button>
@@ -893,8 +895,8 @@ export default function AdminAnnouncementsPage() {
               onChange={(event) =>
                 setStatusFilter(
                   event.target.value as
-                    | "all"
-                    | AnnouncementStatus,
+                  | "all"
+                  | AnnouncementStatus,
                 )
               }
               className="h-11 min-w-44 rounded-xl border border-slate-200 bg-slate-50/60 px-3 text-sm text-slate-700 outline-none transition focus:border-brand-navy focus:bg-white focus:ring-4 focus:ring-brand-navy/5"
@@ -921,8 +923,8 @@ export default function AdminAnnouncementsPage() {
               onChange={(event) =>
                 setAudienceFilter(
                   event.target.value as
-                    | "all"
-                    | AnnouncementAudience,
+                  | "all"
+                  | AnnouncementAudience,
                 )
               }
               className="h-11 min-w-44 rounded-xl border border-slate-200 bg-slate-50/60 px-3 text-sm text-slate-700 outline-none transition focus:border-brand-navy focus:bg-white focus:ring-4 focus:ring-brand-navy/5"
@@ -945,6 +947,10 @@ export default function AdminAnnouncementsPage() {
 
               <option value="staff">
                 Staff
+              </option>
+
+              <option value="finance">
+                Finance
               </option>
             </select>
           </div>
@@ -1030,7 +1036,7 @@ export default function AdminAnnouncementsPage() {
 
                   const creator =
                     typeof announcement.createdBy ===
-                    "object"
+                      "object"
                       ? announcement.createdBy
                       : null;
 
@@ -1110,67 +1116,67 @@ export default function AdminAnnouncementsPage() {
                           <div className="flex shrink-0 flex-wrap items-center gap-2 xl:max-w-xs xl:justify-end">
                             {announcement.status ===
                               "draft" && (
-                              <Button
-                                type="button"
-                                size="sm"
-                                disabled={isProcessing}
-                                onClick={() =>
-                                  handlePublish(
-                                    announcement,
-                                  )
-                                }
-                                className="bg-brand-navy text-white hover:bg-brand-navy/90"
-                              >
-                                {isProcessing ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Send className="h-4 w-4" />
-                                )}
-                                Publish
-                              </Button>
-                            )}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={isProcessing}
+                                  onClick={() =>
+                                    handlePublish(
+                                      announcement,
+                                    )
+                                  }
+                                  className="bg-brand-navy text-white hover:bg-brand-navy/90"
+                                >
+                                  {isProcessing ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Send className="h-4 w-4" />
+                                  )}
+                                  Publish
+                                </Button>
+                              )}
 
                             {announcement.status !==
                               "archived" && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={isProcessing}
-                                onClick={() =>
-                                  openEdit(
-                                    announcement,
-                                  )
-                                }
-                                className="border-slate-200 hover:border-brand-navy/30 hover:bg-brand-navy/5"
-                              >
-                                <Edit3 className="h-4 w-4" />
-                                Edit
-                              </Button>
-                            )}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isProcessing}
+                                  onClick={() =>
+                                    openEdit(
+                                      announcement,
+                                    )
+                                  }
+                                  className="border-slate-200 hover:border-brand-navy/30 hover:bg-brand-navy/5"
+                                >
+                                  <Edit3 className="h-4 w-4" />
+                                  Edit
+                                </Button>
+                              )}
 
                             {announcement.status !==
                               "archived" && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={isProcessing}
-                                onClick={() =>
-                                  handleArchive(
-                                    announcement,
-                                  )
-                                }
-                                className="border-slate-200 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
-                              >
-                                {isProcessing ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Archive className="h-4 w-4" />
-                                )}
-                                Archive
-                              </Button>
-                            )}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isProcessing}
+                                  onClick={() =>
+                                    handleArchive(
+                                      announcement,
+                                    )
+                                  }
+                                  className="border-slate-200 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                                >
+                                  {isProcessing ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Archive className="h-4 w-4" />
+                                  )}
+                                  Archive
+                                </Button>
+                              )}
 
                             <Button
                               type="button"
@@ -1345,6 +1351,9 @@ export default function AdminAnnouncementsPage() {
                       <option value="staff">
                         Staff
                       </option>
+                      <option value="finance">
+                        Finance
+                      </option>
                     </select>
                   </div>
 
@@ -1365,8 +1374,8 @@ export default function AdminAnnouncementsPage() {
                           status:
                             event.target
                               .value as
-                              | "draft"
-                              | "published",
+                            | "draft"
+                            | "published",
                         }))
                       }
                       className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-sm outline-none transition focus:border-brand-navy focus:bg-white focus:ring-4 focus:ring-brand-navy/5"
@@ -1384,26 +1393,26 @@ export default function AdminAnnouncementsPage() {
 
                 {form.status ===
                   "published" && (
-                  <div className="flex gap-3 rounded-2xl border border-brand-gold/30 bg-brand-gold/10 p-4">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gold/20">
-                      <Send className="h-4 w-4 text-brand-navy" />
-                    </div>
+                    <div className="flex gap-3 rounded-2xl border border-brand-gold/30 bg-brand-gold/10 p-4">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gold/20">
+                        <Send className="h-4 w-4 text-brand-navy" />
+                      </div>
 
-                    <div>
-                      <p className="text-sm font-semibold text-brand-navy">
-                        Ready to publish
-                      </p>
+                      <div>
+                        <p className="text-sm font-semibold text-brand-navy">
+                          Ready to publish
+                        </p>
 
-                      <p className="mt-1 text-xs leading-5 text-slate-600">
-                        This announcement will be
-                        published immediately and the
-                        administration notification
-                        system will record the
-                        publication event.
-                      </p>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">
+                          This announcement will be
+                          published immediately and the
+                          administration notification
+                          system will record the
+                          publication event.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             </div>
 
@@ -1436,7 +1445,7 @@ export default function AdminAnnouncementsPage() {
                 {editingAnnouncement
                   ? "Save Changes"
                   : form.status ===
-                      "published"
+                    "published"
                     ? "Publish Announcement"
                     : "Save Draft"}
               </Button>
@@ -1506,7 +1515,7 @@ export default function AdminAnnouncementsPage() {
                   className="shadow-sm"
                 >
                   {processingId ===
-                  deleteTarget._id ? (
+                    deleteTarget._id ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Trash2 className="h-4 w-4" />

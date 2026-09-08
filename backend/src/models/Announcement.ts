@@ -12,7 +12,8 @@ export type AnnouncementAudience =
   | "everyone"
   | "students"
   | "lecturers"
-  | "staff";
+  | "staff"
+  | "finance";
 
 export type AnnouncementStatus =
   | "draft"
@@ -65,6 +66,7 @@ const announcementSchema =
           "students",
           "lecturers",
           "staff",
+          "finance",
         ],
         default: "everyone",
         required: true,
@@ -95,6 +97,20 @@ const announcementSchema =
       timestamps: true,
     },
   );
+
+/* =========================================================
+   INDEXES
+========================================================= */
+
+announcementSchema.index({
+  status: 1,
+  audience: 1,
+  createdAt: -1,
+});
+
+announcementSchema.index({
+  createdAt: -1,
+});
 
 /* =========================================================
    MODEL

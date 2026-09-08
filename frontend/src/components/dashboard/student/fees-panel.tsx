@@ -1,18 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle, Clock, XCircle, AlertCircle } from "lucide-react";
 
 interface Semester {
   _id: string;
   name: string;
 }
 
+type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
+type PaymentStatus = "pending" | "successful" | "failed" | "refunded" | "cancelled";
+type PaymentPurpose = "tuition" | "registration" | "examination" | "acceptance" | "transcript" | "certificate" | "hostel" | "other";
+
 interface Payment {
   _id: string;
   amount: number;
-  method: string;
-  reference?: string;
+  currency: string;
+  method: PaymentMethod;
+  purpose: PaymentPurpose;
+  paymentReference: string;
+  status: PaymentStatus;
+  semester?: {
+    _id: string;
+    name: string;
+  };
   createdAt: string;
+  paidAt?: string;
 }
 
 interface Balance {
@@ -23,6 +37,32 @@ interface Balance {
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+const STATUS_LABELS: Record<PaymentStatus, string> = {
+  pending: "Pending",
+  successful: "Successful",
+  failed: "Failed",
+  refunded: "Refunded",
+  cancelled: "Cancelled",
+};
+
+const PURPOSE_LABELS: Record<PaymentPurpose, string> = {
+  tuition: "Tuition",
+  registration: "Registration",
+  examination: "Examination",
+  acceptance: "Acceptance",
+  transcript: "Transcript",
+  certificate: "Certificate",
+  hostel: "Hostel",
+  other: "Other",
+};
+
+const METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: "Cash",
+  bank_transfer: "Bank Transfer",
+  card: "Card",
+  other: "Other",
+};
 
 export default function FeesPanel({ accessToken }: { accessToken: string }) {
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -64,9 +104,48 @@ export default function FeesPanel({ accessToken }: { accessToken: string }) {
     });
   }, [selectedSemester, accessToken]);
 
+  const formatCurrency = (amount: number, currency: string = "NGN") => {
+    return new Intl.NumberFormat("en-NG", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "N/A";
+    return date.toLocaleDateString("en-NG", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const getStatusBadge = (status: PaymentStatus) => {
+    const variants: Record<PaymentStatus, { bg: string; text: string; icon: any }> = {
+      pending: { bg: "bg-amber-50", text: "text-amber-700", icon: Clock },
+      successful: { bg: "bg-emerald-50", text: "text-emerald-700", icon: CheckCircle },
+      failed: { bg: "bg-red-50", text: "text-red-700", icon: XCircle },
+      refunded: { bg: "bg-slate-50", text: "text-slate-700", icon: AlertCircle },
+      cancelled: { bg: "bg-slate-50", text: "text-slate-700", icon: XCircle },
+    };
+
+    const { bg, text, icon: Icon } = variants[status];
+
+    return (
+      <Badge className={`border-0 ${bg} ${text} shadow-none`}>
+        <Icon className="mr-1 h-3 w-3" />
+        {STATUS_LABELS[status]}
+      </Badge>
+    );
+  };
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-      <h2 className="text-xl font-semibold text-brand-navy">Fees</h2>
+      <h2 className="text-xl font-semibold text-brand-navy">Fees & Payments</h2>
 
       <label className="mt-4 block text-sm font-medium">Semester</label>
       <select
@@ -93,8 +172,8 @@ export default function FeesPanel({ accessToken }: { accessToken: string }) {
             <div className="mt-4 rounded-lg bg-brand-light p-4 text-sm">
               <p className="font-medium text-brand-navy">Balance summary</p>
               <p className="mt-1 text-slate-600">
-                Fee: {balance.feeAmount.toLocaleString()} • Paid:{" "}
-                {balance.totalPaid.toLocaleString()} •{" "}
+                Fee: {formatCurrency(balance.feeAmount)} • Paid:{" "}
+                {formatCurrency(balance.totalPaid)} •{" "}
                 <span
                   className={
                     balance.balance > 0
@@ -103,7 +182,7 @@ export default function FeesPanel({ accessToken }: { accessToken: string }) {
                   }
                 >
                   {balance.balance > 0
-                    ? `Balance owed: ${balance.balance.toLocaleString()}`
+                    ? `Balance owed: ${formatCurrency(balance.balance)}`
                     : "Fully paid"}
                 </span>
               </p>
@@ -120,20 +199,24 @@ export default function FeesPanel({ accessToken }: { accessToken: string }) {
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-500">
                     <th className="pb-2">Date</th>
+                    <th className="pb-2">Reference</th>
+                    <th className="pb-2">Purpose</th>
                     <th className="pb-2">Amount</th>
                     <th className="pb-2">Method</th>
-                    <th className="pb-2">Reference</th>
+                    <th className="pb-2">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {payments.map((p) => (
                     <tr key={p._id} className="border-b border-slate-100">
-                      <td className="py-2">{new Date(p.createdAt).toLocaleDateString()}</td>
+                      <td className="py-2">{formatDate(p.paidAt || p.createdAt)}</td>
+                      <td className="py-2 font-medium text-brand-navy">{p.paymentReference}</td>
+                      <td className="py-2">{PURPOSE_LABELS[p.purpose]}</td>
                       <td className="py-2 font-medium text-brand-navy">
-                        {p.amount.toLocaleString()}
+                        {formatCurrency(p.amount, p.currency)}
                       </td>
-                      <td className="py-2 capitalize">{p.method.replace("_", " ")}</td>
-                      <td className="py-2">{p.reference || "—"}</td>
+                      <td className="py-2">{METHOD_LABELS[p.method]}</td>
+                      <td className="py-2">{getStatusBadge(p.status)}</td>
                     </tr>
                   ))}
                 </tbody>

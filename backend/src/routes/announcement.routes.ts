@@ -18,8 +18,11 @@ import {
 const router = Router();
 
 /* =========================================================
-   ADMIN / REGISTRAR
+   ADMIN / REGISTRAR / FINANCE
    GET ALL ANNOUNCEMENTS
+
+   Finance receives a restricted response from the controller:
+   published + everyone/staff/finance only.
 ========================================================= */
 
 router.get(
@@ -28,13 +31,16 @@ router.get(
   authorize(
     "admin",
     "registrar",
+    "finance",
   ),
   getAllAnnouncements,
 );
 
 /* =========================================================
-   ADMIN / REGISTRAR
+   ADMIN / REGISTRAR / FINANCE
    GET SINGLE ANNOUNCEMENT
+
+   Finance access is restricted inside the controller.
 ========================================================= */
 
 router.get(
@@ -43,6 +49,7 @@ router.get(
   authorize(
     "admin",
     "registrar",
+    "finance",
   ),
   getAnnouncementById,
 );

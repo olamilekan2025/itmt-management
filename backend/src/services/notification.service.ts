@@ -52,3 +52,41 @@ export async function notifyAdmins(input: NotifyAdminsInput) {
     return [];
   }
 }
+
+interface NotifyByRoleInput {
+  title: string;
+  message: string;
+  type: NotificationType;
+  link?: string;
+  metadata?: Record<string, unknown>;
+}
+
+// Creates the same notification for every active user with the given role(s).
+export async function notifyByRole(roles: string | string[], input: NotifyByRoleInput) {
+  try {
+    const roleList = Array.isArray(roles) ? roles : [roles];
+
+    const users = await User.find({
+      role: { $in: roleList },
+      isActive: true,
+    }).select("_id");
+
+    if (users.length === 0) {
+      return [];
+    }
+
+    const documents = users.map((user) => ({
+      recipient: user._id,
+      title: input.title,
+      message: input.message,
+      type: input.type,
+      link: input.link,
+      metadata: input.metadata,
+    }));
+
+    return await Notification.insertMany(documents);
+  } catch (error) {
+    console.error("Notify by role error:", error);
+    return [];
+  }
+}

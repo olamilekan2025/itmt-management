@@ -4,10 +4,12 @@ import {
   getFinanceDashboard,
   getMyBalance,
   getMyPayments,
+  getPaymentById,
   getPayments,
   getStudentBalance,
   getStudentsFees,
   recordPayment,
+  verifyPayment,
 } from "../controllers/payment.controller.js";
 
 import {
@@ -30,11 +32,7 @@ router.post(
 
 /**
  * Finance/Admin
- * Get payment records
- *
- * Optional query parameters:
- * ?student=STUDENT_ID
- * ?semester=SEMESTER_ID
+ * Get payment records with filtering and pagination
  */
 router.get(
   "/",
@@ -46,9 +44,6 @@ router.get(
 /**
  * Finance/Admin
  * Finance dashboard summary
- *
- * Optional:
- * ?semester=SEMESTER_ID
  */
 router.get(
   "/dashboard",
@@ -60,14 +55,6 @@ router.get(
 /**
  * Finance/Admin
  * Get all students with their fee/payment status
- *
- * Required:
- * ?semester=SEMESTER_ID
- *
- * Optional:
- * ?programme=PROGRAMME_ID
- * ?level=LEVEL
- * ?search=NAME_OR_EMAIL_OR_MATRIC
  */
 router.get(
   "/students-fees",
@@ -79,9 +66,6 @@ router.get(
 /**
  * Finance/Admin
  * Get a specific student's balance
- *
- * Required:
- * ?student=STUDENT_ID&semester=SEMESTER_ID
  */
 router.get(
   "/balance",
@@ -93,9 +77,6 @@ router.get(
 /**
  * Student
  * Get own payment history
- *
- * Optional:
- * ?semester=SEMESTER_ID
  */
 router.get(
   "/me",
@@ -107,15 +88,35 @@ router.get(
 /**
  * Student
  * Get own balance
- *
- * Required:
- * ?semester=SEMESTER_ID
  */
 router.get(
   "/me/balance",
   authenticate,
   authorize("student"),
   getMyBalance,
+);
+
+/**
+ * Finance/Admin
+ * Get a specific payment by ID
+ * ⚠️ MUST stay after all static routes above — this catches everything else
+ */
+router.get(
+  "/:id",
+  authenticate,
+  authorize("finance", "admin"),
+  getPaymentById,
+);
+
+/**
+ * Finance/Admin
+ * Verify a payment
+ */
+router.post(
+  "/:id/verify",
+  authenticate,
+  authorize("finance", "admin"),
+  verifyPayment,
 );
 
 export default router;
