@@ -45,7 +45,46 @@ function getApiUrl(): string {
 ========================================================= */
 
 function normalizePath(path: string): string {
-  return path.startsWith("/") ? path : `/${path}`;
+  const normalized = path.trim();
+
+  if (!normalized) {
+    return "/";
+  }
+
+  return normalized.startsWith("/")
+    ? normalized
+    : `/${normalized}`;
+}
+
+/* =========================================================
+   NORMALIZE API PATH
+   ---------------------------------------------------------
+   Backend routes are mounted under /api.
+
+   Examples:
+   /users              -> /api/users
+   /users?role=student -> /api/users?role=student
+   /courses            -> /api/courses
+   /api/users          -> /api/users
+   ========================================================= */
+
+function normalizeApiPath(path: string): string {
+  const normalizedPath = normalizePath(path);
+
+  // Already contains /api
+  if (
+    normalizedPath === "/api" ||
+    normalizedPath.startsWith("/api/")
+  ) {
+    return normalizedPath;
+  }
+
+  // Add /api to normal backend routes
+  if (normalizedPath === "/") {
+    return "/api/";
+  }
+
+  return `/api${normalizedPath}`;
 }
 
 /* =========================================================
@@ -63,9 +102,16 @@ async function apiFetch<T>(
   }, 15000);
 
   const normalizedPath = normalizePath(path);
-  const url = `${getApiUrl()}${normalizedPath}`;
+  const apiPath = normalizeApiPath(path);
+  const url = `${getApiUrl()}${apiPath}`;
 
   try {
+    console.log(
+      "[ITMT API]",
+      options.method ?? "GET",
+      url,
+    );
+
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,
@@ -106,7 +152,8 @@ async function apiFetch<T>(
     ===================================================== */
 
     if (!response.ok) {
-      let message = `Request failed with status ${response.status}`;
+      let message =
+        `Request failed with status ${response.status}`;
 
       if (
         typeof data === "object" &&

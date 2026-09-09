@@ -1,20 +1,42 @@
 import cloudinary from "../config/cloudinary.js";
 
-export function uploadBufferToCloudinary(
+export interface CloudinaryUploadResult {
+  secure_url: string;
+  public_id: string;
+  resource_type: string;
+  format?: string;
+}
+
+export async function uploadBufferToCloudinary(
   buffer: Buffer,
   folder: string,
-): Promise<{ secure_url: string; public_id: string }> {
+): Promise<CloudinaryUploadResult> {
   return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type: "image" },
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: "auto",
+      },
       (error, result) => {
-        if (error || !result) {
-          return reject(error || new Error("Cloudinary upload failed"));
+        if (error) {
+          reject(error);
+          return;
         }
-        resolve({ secure_url: result.secure_url, public_id: result.public_id });
+
+        if (!result) {
+          reject(new Error("Cloudinary upload failed"));
+          return;
+        }
+
+        resolve({
+          secure_url: result.secure_url,
+          public_id: result.public_id,
+          resource_type: result.resource_type,
+          format: result.format,
+        });
       },
     );
 
-    stream.end(buffer);
+    uploadStream.end(buffer);
   });
 }

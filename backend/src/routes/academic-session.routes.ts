@@ -1,10 +1,13 @@
+
 import { Router } from "express";
 
 import {
-  activateAcademicSession,
   createAcademicSession,
   getAcademicSessions,
+  getPublicAcademicSessions,
+  activateAcademicSession,
 } from "../controllers/academic-session.controller.js";
+
 import {
   authenticate,
   authorize,
@@ -12,8 +15,45 @@ import {
 
 const router = Router();
 
-router.get("/", authenticate, getAcademicSessions);
+/**
+ * =========================================================
+ * PUBLIC ROUTES
+ * =========================================================
+ */
 
+/**
+ * GET /api/academic-sessions/public
+ *
+ * Public endpoint used by the admission application form.
+ */
+router.get(
+  "/public",
+  getPublicAcademicSessions,
+);
+
+/**
+ * =========================================================
+ * PROTECTED ROUTES
+ * =========================================================
+ */
+
+/**
+ * GET /api/academic-sessions
+ *
+ * Admin and Registrar can view academic sessions.
+ */
+router.get(
+  "/",
+  authenticate,
+  authorize("admin", "registrar"),
+  getAcademicSessions,
+);
+
+/**
+ * POST /api/academic-sessions
+ *
+ * Admin and Registrar can create academic sessions.
+ */
 router.post(
   "/",
   authenticate,
@@ -21,6 +61,11 @@ router.post(
   createAcademicSession,
 );
 
+/**
+ * PATCH /api/academic-sessions/:id/activate
+ *
+ * Admin and Registrar can activate an academic session.
+ */
 router.patch(
   "/:id/activate",
   authenticate,
@@ -29,3 +74,4 @@ router.patch(
 );
 
 export default router;
+

@@ -3,7 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LogIn, UserPlus } from "lucide-react";
+import {
+  ArrowRight,
+  LogIn,
+  Menu,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 
 const navLinks = [
@@ -27,37 +32,48 @@ export default function PublicNavbar() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-md">
-      <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Logo */}
+    <header className="sticky top-0 z-50 w-full border-b border-slate-200/70 bg-white/90 shadow-[0_1px_0_rgba(15,23,42,0.02)] backdrop-blur-xl">
+      <div className="mx-auto flex h-[76px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        {/* ───────────────── Logo ───────────────── */}
         <Link
           href="/"
           onClick={closeMobileMenu}
-          className="flex items-center gap-3"
+          className="group flex shrink-0 items-center gap-3"
+          aria-label="ITMT Management System home"
         >
-          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl shadow-sm">
+          <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-md">
             <Image
               src="/newLogo.png"
               alt="ITMT logo"
               fill
-              sizes="40px"
-              className="object-cover"
+              sizes="44px"
+              className="object-contain p-1"
               priority
             />
           </div>
 
           <div className="hidden sm:block">
-            <p className="text-sm font-bold leading-none tracking-tight text-brand-navy">
-              ITMT
-            </p>
-            <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500">
+            <div className="flex items-center gap-2">
+              <span className="text-base font-extrabold tracking-tight text-brand-navy">
+                ITMT
+              </span>
+
+              <span className="rounded-full bg-brand-light px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-brand-navy">
+                Portal
+              </span>
+            </div>
+
+            <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-500">
               Management System
             </p>
           </div>
         </Link>
 
-        {/* Desktop navigation */}
-        <nav className="hidden items-center gap-1 lg:flex">
+        {/* ───────────────── Desktop Navigation ───────────────── */}
+        <nav
+          className="hidden items-center rounded-full border border-slate-200/70 bg-slate-50/70 p-1 lg:flex"
+          aria-label="Main navigation"
+        >
           {navLinks.map((link) => {
             const active = isActive(link.href);
 
@@ -65,44 +81,48 @@ export default function PublicNavbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+                className={`relative rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                   active
-                    ? "bg-brand-light text-brand-navy"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-brand-navy"
+                    ? "bg-white text-brand-navy shadow-sm"
+                    : "text-slate-600 hover:bg-white/80 hover:text-brand-navy"
                 }`}
               >
                 {link.label}
+
+                {active && (
+                  <span className="absolute bottom-0.5 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-brand-gold" />
+                )}
               </Link>
             );
           })}
         </nav>
 
-        {/* Desktop actions */}
+        {/* ───────────────── Desktop Actions ───────────────── */}
         <div className="hidden items-center gap-2 lg:flex">
           <Link
             href="/auth/login"
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-brand-navy transition-colors hover:bg-brand-light"
+            className="group inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-navy transition-all duration-200 hover:bg-brand-light"
           >
-            <LogIn className="h-4 w-4" />
+            <LogIn className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
             Sign in
           </Link>
 
           <Link
-                      href="/admission-form/apply"
-            className="inline-flex items-center gap-2 rounded-lg bg-brand-navy px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-brand-dark hover:shadow-md"
+            href="/admission-form/apply"
+            className="group inline-flex items-center gap-2 rounded-xl bg-brand-navy px-4.5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(15,23,42,0.15)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-[0_12px_25px_rgba(15,23,42,0.2)]"
           >
-            <UserPlus className="h-4 w-4" />
             Apply Now
+            <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
           </Link>
         </div>
 
-        {/* Mobile menu button */}
+        {/* ───────────────── Mobile Menu Button ───────────────── */}
         <button
           type="button"
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((current) => !current)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-brand-navy transition-colors hover:bg-slate-50 lg:hidden"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-brand-navy shadow-sm transition-all duration-200 hover:border-brand-navy/20 hover:bg-brand-light lg:hidden"
         >
           {mobileOpen ? (
             <X className="h-5 w-5" />
@@ -112,53 +132,78 @@ export default function PublicNavbar() {
         </button>
       </div>
 
-      {/* Mobile navigation */}
-      {mobileOpen && (
-        <div className="border-t border-slate-100 bg-white lg:hidden">
-          <nav className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-            <div className="space-y-1">
-              {navLinks.map((link) => {
-                const active = isActive(link.href);
+      {/* ───────────────── Mobile Navigation ───────────────── */}
+      <div
+        className={`overflow-hidden border-t border-slate-100 bg-white transition-all duration-300 ease-out lg:hidden ${
+          mobileOpen
+            ? "max-h-[600px] opacity-100"
+            : "pointer-events-none max-h-0 opacity-0"
+        }`}
+      >
+        <nav
+          className="mx-auto max-w-7xl px-4 py-5 sm:px-6"
+          aria-label="Mobile navigation"
+        >
+          {/* Mobile links */}
+          <div className="space-y-1">
+            {navLinks.map((link) => {
+              const active = isActive(link.href);
 
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={closeMobileMenu}
-                    className={`block rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={closeMobileMenu}
+                  className={`group flex items-center justify-between rounded-xl px-4 py-3.5 text-sm font-semibold transition-all duration-200 ${
+                    active
+                      ? "bg-brand-light text-brand-navy"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-brand-navy"
+                  }`}
+                >
+                  <span>{link.label}</span>
+
+                  <ArrowRight
+                    className={`h-4 w-4 transition-all duration-200 ${
                       active
-                        ? "bg-brand-light text-brand-navy"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-brand-navy"
+                        ? "translate-x-0 opacity-100"
+                        : "-translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100"
                     }`}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </div>
+                  />
+                </Link>
+              );
+            })}
+          </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
-              <Link
-                href="/auth/login"
-                onClick={closeMobileMenu}
-                className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-brand-navy transition-colors hover:bg-slate-50"
-              >
-                <LogIn className="h-4 w-4" />
-                Sign in
-              </Link>
+          {/* Mobile actions */}
+          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-5">
+            <Link
+              href="/auth/login"
+              onClick={closeMobileMenu}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-brand-navy transition-all duration-200 hover:border-brand-navy/20 hover:bg-brand-light"
+            >
+              <LogIn className="h-4 w-4" />
+              Sign in
+            </Link>
 
-              <Link
-                href="/auth/login"
-                onClick={closeMobileMenu}
-                className="flex items-center justify-center gap-2 rounded-lg bg-brand-navy px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
-              >
-                <UserPlus className="h-4 w-4" />
-                Apply Now
-              </Link>
-            </div>
-          </nav>
-        </div>
-      )}
+            <Link
+              href="/admission-form/apply"
+              onClick={closeMobileMenu}
+              className="group inline-flex items-center justify-center gap-2 rounded-xl bg-brand-navy px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-brand-dark"
+            >
+              Apply Now
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+
+          {/* Mobile institutional note */}
+          <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+            <p className="text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              ITMT Management System
+            </p>
+          </div>
+        </nav>
+      </div>
     </header>
   );
 }
+

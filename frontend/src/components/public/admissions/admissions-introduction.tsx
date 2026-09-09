@@ -1,20 +1,29 @@
 export default function AdmissionsIntroduction() {
   return (
-    <section className="py-16 sm:py-20">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl text-center">
-          <h2 className="font-sans text-3xl font-semibold leading-tight text-brand-navy sm:text-4xl">
+    <section className="relative overflow-hidden border-t border-slate-200 bg-slate-50 py-24">
+      <div className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-blue/5 blur-3xl" />
+
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-4xl text-center">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-brand-navy shadow-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-gold" />
+            Your journey starts here
+          </div>
+
+          <h2 className="text-3xl font-bold leading-tight tracking-tight text-brand-navy sm:text-4xl lg:text-5xl">
             A clear path toward your academic goals.
           </h2>
 
-          <p className="mt-6 text-base leading-7 text-slate-600 sm:text-lg">
+          <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg">
             ITMT provides a structured admissions experience designed to help
-            prospective students understand available academic opportunities and
-            the steps involved in beginning their studies.
+            prospective students understand available academic opportunities
+            and the steps involved in beginning their studies.
           </p>
 
-          <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
-            Explore the information relevant to your intended programme, review the available requirements, and follow the appropriate application process based on your institution&apos;s current configuration.
+          <p className="mx-auto mt-4 max-w-3xl text-base leading-8 text-slate-600">
+            Explore information relevant to your intended programme, review
+            available requirements, and follow the appropriate application
+            process based on the institution&apos;s current configuration.
           </p>
         </div>
       </div>

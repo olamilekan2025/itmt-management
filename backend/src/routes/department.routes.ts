@@ -1,11 +1,13 @@
 import { Router } from "express";
 
 import {
-  archiveDepartment,
   createDepartment,
   getDepartments,
+  getPublicDepartments,
   updateDepartment,
+  archiveDepartment,
 } from "../controllers/department.controller.js";
+
 import {
   authenticate,
   authorize,
@@ -13,8 +15,45 @@ import {
 
 const router = Router();
 
-router.get("/", authenticate, getDepartments);
+/**
+ * =========================================================
+ * PUBLIC ROUTES
+ * =========================================================
+ */
 
+/**
+ * GET /api/departments/public
+ *
+ * Public endpoint used by admission forms.
+ */
+router.get(
+  "/public",
+  getPublicDepartments,
+);
+
+/**
+ * =========================================================
+ * PROTECTED ROUTES
+ * =========================================================
+ */
+
+/**
+ * GET /api/departments
+ *
+ * Admin and Registrar can view departments.
+ */
+router.get(
+  "/",
+  authenticate,
+  authorize("admin", "registrar"),
+  getDepartments,
+);
+
+/**
+ * POST /api/departments
+ *
+ * Admin and Registrar can create departments.
+ */
 router.post(
   "/",
   authenticate,
@@ -22,6 +61,11 @@ router.post(
   createDepartment,
 );
 
+/**
+ * PATCH /api/departments/:id
+ *
+ * Admin and Registrar can update departments.
+ */
 router.patch(
   "/:id",
   authenticate,
@@ -29,11 +73,17 @@ router.patch(
   updateDepartment,
 );
 
-router.delete(
-  "/:id",
+/**
+ * PATCH /api/departments/:id/archive
+ *
+ * Admin and Registrar can archive departments.
+ */
+router.patch(
+  "/:id/archive",
   authenticate,
-  authorize("admin"),
+  authorize("admin", "registrar"),
   archiveDepartment,
 );
 
 export default router;
+

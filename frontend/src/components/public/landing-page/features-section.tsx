@@ -1,10 +1,15 @@
+"use client";
+
+import { motion } from "framer-motion";
+
 import {
-  GraduationCap,
-  Users,
+  ArrowUpRight,
   BookOpen,
   FileText,
-  WalletCards,
+  GraduationCap,
   Settings,
+  Users,
+  WalletCards,
 } from "lucide-react";
 
 import FeatureCard from "./feature-card";
@@ -20,7 +25,7 @@ const features = [
     icon: Users,
     title: "Student Management",
     description:
-      "Maintain complete student profiles, enrollment information, academic records, and institutional data.",
+      "Maintain complete student profiles, enrolment information, academic records, and institutional data.",
   },
   {
     icon: BookOpen,
@@ -32,7 +37,7 @@ const features = [
     icon: FileText,
     title: "Results Management",
     description:
-      "Allow lecturers to submit results, administrators to review and publish them, and students to access their results securely.",
+      "Allow lecturers to submit results, administrators to review and publish them, and students to access results securely.",
   },
   {
     icon: WalletCards,
@@ -52,51 +57,177 @@ export default function FeaturesSection() {
   return (
     <section
       id="features"
-      className="relative overflow-hidden bg-white py-20 md:py-24 lg:py-32"
+      className="relative overflow-hidden bg-white py-20 md:py-24 lg:py-28"
     >
-      {/* Decorative background */}
+      {/* Background atmosphere */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-gold/5 blur-3xl"
+        className="
+          pointer-events-none absolute
+          -right-40 top-20
+          h-96 w-96
+          rounded-full
+          bg-brand-blue/[0.035]
+          blur-3xl
+        "
+      />
+
+      <div
+        aria-hidden="true"
+        className="
+          pointer-events-none absolute
+          -left-40 bottom-10
+          h-96 w-96
+          rounded-full
+          bg-brand-gold/[0.035]
+          blur-3xl
+        "
+      />
+
+      {/* Subtle grid */}
+      <div
+        aria-hidden="true"
+        className="
+          pointer-events-none absolute inset-0
+          opacity-[0.018]
+          [background-image:linear-gradient(rgba(15,23,42,1)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,1)_1px,transparent_1px)]
+          [background-size:48px_48px]
+        "
       />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
-        <div className="mx-auto max-w-3xl text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-brand-navy/10 bg-brand-light px-4 py-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand-gold" />
+        {/* Section heading */}
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{
+            duration: 0.55,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          className="mx-auto max-w-3xl text-center"
+        >
+          {/* Eyebrow */}
+          <div className="mb-5 inline-flex items-center gap-3">
+            <span className="h-px w-8 bg-brand-gold" />
 
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-navy">
+            <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-brand-navy">
               Platform Features
             </span>
+
+            <span className="h-px w-8 bg-brand-gold" />
           </div>
 
-          <h2 className="mt-6 font-sans text-3xl font-semibold tracking-tight text-brand-navy sm:text-4xl lg:text-5xl">
+          {/* Heading */}
+          <h2 className="font-serif text-3xl font-medium leading-[1.12] tracking-tight text-brand-navy sm:text-4xl lg:text-[44px]">
             Everything your institution needs,
-            <span className="block text-brand-navy/70">
+            <span className="block text-brand-blue">
               connected in one platform.
             </span>
           </h2>
 
-          <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
+          {/* Description */}
+          <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-slate-500 md:text-[15px]">
             ITMT brings academic, student, administrative, financial, and
             institutional operations together so everyone can work with
             accurate information from one trusted system.
           </p>
+        </motion.div>
+
+        {/* Feature grid */}
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:mt-14 lg:grid-cols-12">
+          {/* Featured academic management */}
+          <div className="lg:col-span-6">
+            <FeatureCard
+              icon={features[0].icon}
+              title={features[0].title}
+              description={features[0].description}
+              variant="featured"
+              number="01"
+            />
+          </div>
+
+          {/* Student management */}
+          <div className="lg:col-span-3">
+            <FeatureCard
+              icon={features[1].icon}
+              title={features[1].title}
+              description={features[1].description}
+              variant="compact"
+              number="02"
+            />
+          </div>
+
+          {/* Course registration */}
+          <div className="lg:col-span-3">
+            <FeatureCard
+              icon={features[2].icon}
+              title={features[2].title}
+              description={features[2].description}
+              variant="compact"
+              number="03"
+            />
+          </div>
+
+          {/* Results */}
+          <div className="lg:col-span-3">
+            <FeatureCard
+              icon={features[3].icon}
+              title={features[3].title}
+              description={features[3].description}
+              variant="light"
+              number="04"
+            />
+          </div>
+
+          {/* Finance */}
+          <div className="lg:col-span-3">
+            <FeatureCard
+              icon={features[4].icon}
+              title={features[4].title}
+              description={features[4].description}
+              variant="light"
+              number="05"
+            />
+          </div>
+
+          {/* Administration — wide */}
+          <div className="sm:col-span-2 lg:col-span-6">
+            <FeatureCard
+              icon={features[5].icon}
+              title={features[5].title}
+              description={features[5].description}
+              variant="institutional"
+              number="06"
+            />
+          </div>
         </div>
 
-        {/* Features */}
-        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:mt-16 lg:grid-cols-3">
-          {features.map((feature) => (
-            <FeatureCard
-              key={feature.title}
-              icon={feature.icon}
-              title={feature.title}
-              description={feature.description}
-            />
-          ))}
-        </div>
+        {/* Bottom statement */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{
+            duration: 0.5,
+            delay: 0.2,
+          }}
+          className="
+            mt-10
+            flex items-center justify-center gap-3
+            text-center
+          "
+        >
+          <span className="h-px w-10 bg-slate-200" />
+
+          <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-slate-400">
+            Academic • Administrative • Institutional
+          </span>
+
+          <span className="h-px w-10 bg-slate-200" />
+        </motion.div>
       </div>
     </section>
   );
 }
+

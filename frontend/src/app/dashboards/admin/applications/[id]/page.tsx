@@ -3,22 +3,29 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
 } from "react";
+
+import { AnimatePresence, motion } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+
 import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
   Clock3,
+  ExternalLink,
   FileText,
+  Image as ImageIcon,
   Loader2,
   Mail,
   MapPin,
   Phone,
   ShieldCheck,
   User,
+  X,
   XCircle,
 } from "lucide-react";
 
@@ -36,6 +43,11 @@ type AdmissionStatus =
   | "APPROVED"
   | "REJECTED"
   | "WITHDRAWN";
+
+type ActionModal =
+  | "approve"
+  | "reject"
+  | null;
 
 type Programme = {
   _id: string;
@@ -80,19 +92,23 @@ type EducationHistory = {
   grade?: string;
 };
 
+type AdmissionDocument = {
+  type: string;
+  filename?: string;
+  url: string;
+};
+
 type Admission = {
   _id: string;
   applicationNumber: string;
 
-  firstName: string;
-  lastName: string;
-  middleName?: string;
+  surname: string;
+  otherNames: string;
 
   email: string;
-  phone?: string;
+  telephone?: string;
 
   dateOfBirth?: string;
-  gender?: string;
   nationality?: string;
 
   postalAddress?: string;
@@ -102,13 +118,10 @@ type Admission = {
   department?: Department | null;
   academicSession?: AcademicSession | null;
 
-  previousInstitution?: string;
-  previousQualification?: string;
-
   referees: Referee[];
   educationHistory: EducationHistory[];
 
-  passportPhotoUrl?: string;
+  documents?: AdmissionDocument[];
 
   medicalCondition?: string;
   referredBy?: string;
@@ -148,7 +161,7 @@ type ActionResponse = {
 
 /*
  * =========================================================
- * STATUS
+ * STATUS CONFIG
  * =========================================================
  */
 
@@ -231,12 +244,24 @@ function getApplicantName(
   admission: Admission,
 ) {
   return [
-    admission.firstName,
-    admission.middleName,
-    admission.lastName,
+    admission.surname,
+    admission.otherNames,
   ]
     .filter(Boolean)
-    .join(" ");
+    .join(" ")
+    .trim();
+}
+
+function getApplicantInitials(
+  admission: Admission,
+) {
+  const surnameInitial =
+    admission.surname?.trim()?.[0] || "";
+
+  const otherNamesInitial =
+    admission.otherNames?.trim()?.[0] || "";
+
+  return `${surnameInitial}${otherNamesInitial}`.toUpperCase();
 }
 
 function getProgrammeName(
@@ -246,6 +271,44 @@ function getProgrammeName(
     programme?.name ||
     programme?.title ||
     "Not specified"
+  );
+}
+
+function getPassportDocument(
+  documents?: AdmissionDocument[],
+) {
+  if (!documents?.length) {
+    return undefined;
+  }
+
+  return documents.find((document) => {
+    const type = document.type
+      ?.trim()
+      .toLowerCase();
+
+    return (
+      type === "passport" ||
+      type === "passportphoto" ||
+      type === "passport_photo" ||
+      type === "passport-photo" ||
+      type === "passport photograph" ||
+      type === "passport_photograph"
+    );
+  });
+}
+
+function getSupportingDocuments(
+  documents?: AdmissionDocument[],
+) {
+  if (!documents?.length) {
+    return [];
+  }
+
+  const passport =
+    getPassportDocument(documents);
+
+  return documents.filter(
+    (document) => document !== passport,
   );
 }
 
@@ -284,6 +347,31 @@ export default function AdminApplicationDetailsPage() {
   const [rejectionReason, setRejectionReason] =
     useState("");
 
+  const [actionModal, setActionModal] =
+    useState<ActionModal>(null);
+
+  /*
+   * =======================================================
+   * DERIVED DOCUMENTS
+   * =======================================================
+   */
+
+  const passportDocument = useMemo(
+    () =>
+      getPassportDocument(
+        application?.documents,
+      ),
+    [application?.documents],
+  );
+
+  const supportingDocuments = useMemo(
+    () =>
+      getSupportingDocuments(
+        application?.documents,
+      ),
+    [application?.documents],
+  );
+
   /*
    * =======================================================
    * LOAD APPLICATION
@@ -300,6 +388,7 @@ export default function AdminApplicationDetailsPage() {
         setError(
           "Authentication token is required. Please sign in again.",
         );
+
         setLoading(false);
         return;
       }
@@ -308,6 +397,7 @@ export default function AdminApplicationDetailsPage() {
         setError(
           "Application ID is missing.",
         );
+
         setLoading(false);
         return;
       }
@@ -329,9 +419,7 @@ export default function AdminApplicationDetailsPage() {
           );
         }
 
-        setApplication(
-          response.data,
-        );
+        setApplication(response.data);
 
         setRejectionReason(
           response.data.rejectionReason ||
@@ -430,13 +518,6 @@ export default function AdminApplicationDetailsPage() {
         return;
       }
 
-      const confirmed =
-        window.confirm(
-          `Approve ${getApplicantName(application)}'s application?\n\nA student account will be created and a matric number will be generated.`,
-        );
-
-      if (!confirmed) return;
-
       try {
         setProcessing(true);
         setError("");
@@ -454,6 +535,8 @@ export default function AdminApplicationDetailsPage() {
               "Unable to approve application.",
           );
         }
+
+        setActionModal(null);
 
         await loadApplication();
       } catch (err) {
@@ -496,15 +579,10 @@ export default function AdminApplicationDetailsPage() {
         setError(
           "Please provide a rejection reason of at least 5 characters.",
         );
+
+        setActionModal(null);
         return;
       }
-
-      const confirmed =
-        window.confirm(
-          `Reject ${getApplicantName(application)}'s application?`,
-        );
-
-      if (!confirmed) return;
 
       try {
         setProcessing(true);
@@ -526,6 +604,8 @@ export default function AdminApplicationDetailsPage() {
           );
         }
 
+        setActionModal(null);
+
         await loadApplication();
       } catch (err) {
         console.error(
@@ -542,6 +622,18 @@ export default function AdminApplicationDetailsPage() {
         setProcessing(false);
       }
     };
+
+  /*
+   * =======================================================
+   * CLOSE MODAL
+   * =======================================================
+   */
+
+  const closeActionModal = () => {
+    if (processing) return;
+
+    setActionModal(null);
+  };
 
   /*
    * =======================================================
@@ -608,7 +700,7 @@ export default function AdminApplicationDetailsPage() {
           <button
             type="button"
             onClick={loadApplication}
-            className="mt-5 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-semibold text-white"
+            className="mt-5 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
           >
             Try again
           </button>
@@ -674,9 +766,10 @@ export default function AdminApplicationDetailsPage() {
 
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-xl font-bold backdrop-blur-sm">
-              {application.firstName?.[0]}
-              {application.lastName?.[0]}
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-lg font-bold backdrop-blur-sm">
+              {getApplicantInitials(
+                application,
+              )}
             </div>
 
             <div>
@@ -773,32 +866,17 @@ export default function AdminApplicationDetailsPage() {
           >
             <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
               <Detail
-                label="First Name"
+                label="Surname"
                 value={
-                  application.firstName
+                  application.surname
                 }
               />
 
               <Detail
-                label="Last Name"
+                label="Other Names"
                 value={
-                  application.lastName
+                  application.otherNames
                 }
-              />
-
-              <Detail
-                label="Middle Name"
-                value={
-                  application.middleName
-                }
-              />
-
-              <Detail
-                label="Gender"
-                value={
-                  application.gender
-                }
-                capitalize
               />
 
               <Detail
@@ -824,9 +902,9 @@ export default function AdminApplicationDetailsPage() {
               />
 
               <Detail
-                label="Phone"
+                label="Telephone"
                 value={
-                  application.phone
+                  application.telephone
                 }
                 icon={Phone}
               />
@@ -866,7 +944,7 @@ export default function AdminApplicationDetailsPage() {
           <SectionCard
             icon={FileText}
             title="Academic Information"
-            description="Programme and previous academic background"
+            description="Programme and academic background"
           >
             <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
               <Detail
@@ -890,20 +968,6 @@ export default function AdminApplicationDetailsPage() {
                   application
                     .academicSession
                     ?.name
-                }
-              />
-
-              <Detail
-                label="Previous Institution"
-                value={
-                  application.previousInstitution
-                }
-              />
-
-              <Detail
-                label="Previous Qualification"
-                value={
-                  application.previousQualification
                 }
               />
 
@@ -934,7 +998,7 @@ export default function AdminApplicationDetailsPage() {
                     index,
                   ) => (
                     <div
-                      key={index}
+                      key={`${education.schoolAttended}-${index}`}
                       className="rounded-xl border border-slate-100 bg-slate-50/70 p-4"
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -992,7 +1056,7 @@ export default function AdminApplicationDetailsPage() {
                     index,
                   ) => (
                     <div
-                      key={index}
+                      key={`${referee.name}-${index}`}
                       className="rounded-xl border border-slate-100 bg-slate-50/70 p-4"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -1017,6 +1081,56 @@ export default function AdminApplicationDetailsPage() {
                         {referee.address}
                       </p>
                     </div>
+                  ),
+                )}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* =============================================
+              SUPPORTING DOCUMENTS
+          ============================================= */}
+
+          {supportingDocuments.length > 0 && (
+            <SectionCard
+              icon={FileText}
+              title="Supporting Documents"
+              description="Documents submitted with the admission application"
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                {supportingDocuments.map(
+                  (
+                    document,
+                    index,
+                  ) => (
+                    <a
+                      key={`${document.type}-${document.filename}-${index}`}
+                      href={document.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 transition hover:border-brand-navy/20 hover:bg-white hover:shadow-sm"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-navy/5 text-brand-navy">
+                        <FileText className="h-5 w-5" />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-800">
+                          {document.filename ||
+                            document.type ||
+                            "Document"}
+                        </p>
+
+                        <p className="mt-0.5 text-xs capitalize text-slate-400">
+                          {document.type?.replace(
+                            /[_-]/g,
+                            " ",
+                          )}
+                        </p>
+                      </div>
+
+                      <ExternalLink className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:text-brand-navy" />
+                    </a>
                   ),
                 )}
               </div>
@@ -1079,29 +1193,57 @@ export default function AdminApplicationDetailsPage() {
 
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-5 py-4">
-              <h2 className="font-semibold text-slate-900">
-                Passport Photograph
-              </h2>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-semibold text-slate-900">
+                    Passport Photograph
+                  </h2>
+
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    Applicant identification photo
+                  </p>
+                </div>
+
+                {passportDocument && (
+                  <ImageIcon className="h-5 w-5 text-brand-navy" />
+                )}
+              </div>
             </div>
 
             <div className="flex justify-center bg-slate-50 p-6">
-              {application.passportPhotoUrl ? (
-                <img
-                  src={
-                    application.passportPhotoUrl
-                  }
-                  alt={getApplicantName(
-                    application,
-                  )}
-                  className="h-64 w-48 rounded-xl object-cover shadow-md"
-                />
+              {passportDocument?.url ? (
+                <div className="space-y-3">
+                  <img
+                    src={
+                      passportDocument.url
+                    }
+                    alt={`${getApplicantName(application)} passport photograph`}
+                    className="h-64 w-48 rounded-xl border border-slate-200 bg-white object-cover shadow-md"
+                  />
+
+                  <a
+                    href={
+                      passportDocument.url
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-brand-navy/20 hover:text-brand-navy"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    View Full Photo
+                  </a>
+                </div>
               ) : (
-                <div className="flex h-64 w-48 items-center justify-center rounded-xl bg-slate-100 text-center">
+                <div className="flex h-64 w-48 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white text-center">
                   <div>
                     <User className="mx-auto h-8 w-8 text-slate-300" />
 
-                    <p className="mt-2 text-xs text-slate-400">
+                    <p className="mt-2 text-xs font-medium text-slate-400">
                       No passport photo
+                    </p>
+
+                    <p className="mt-1 max-w-[150px] text-[10px] leading-4 text-slate-300">
+                      No passport document was found in the submitted documents.
                     </p>
                   </div>
                 </div>
@@ -1240,8 +1382,8 @@ export default function AdminApplicationDetailsPage() {
                 <button
                   type="button"
                   disabled={processing}
-                  onClick={
-                    approveApplication
+                  onClick={() =>
+                    setActionModal("approve")
                   }
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-navy px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -1272,6 +1414,26 @@ export default function AdminApplicationDetailsPage() {
                     placeholder="Enter the reason for rejecting this application..."
                     className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-red-300 focus:bg-white focus:ring-4 focus:ring-red-500/5"
                   />
+
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400">
+                      Minimum 5 characters
+                    </span>
+
+                    <span
+                      className={`text-[11px] font-medium ${
+                        rejectionReason.trim()
+                          .length >= 5
+                          ? "text-emerald-600"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      {
+                        rejectionReason.trim()
+                          .length
+                      }/5
+                    </span>
+                  </div>
                 </div>
 
                 <button
@@ -1281,8 +1443,8 @@ export default function AdminApplicationDetailsPage() {
                     rejectionReason.trim()
                       .length < 5
                   }
-                  onClick={
-                    rejectApplication
+                  onClick={() =>
+                    setActionModal("reject")
                   }
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -1333,6 +1495,340 @@ export default function AdminApplicationDetailsPage() {
           )}
         </div>
       </div>
+
+      {/* =================================================
+          PREMIUM CONFIRMATION MODAL
+      ================================================= */}
+
+      <AnimatePresence>
+        {actionModal && (
+          <motion.div
+            className="fixed inset-0 z-[999] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={(event) => {
+              if (
+                event.target ===
+                  event.currentTarget &&
+                !processing
+              ) {
+                closeActionModal();
+              }
+            }}
+          >
+            {/* Backdrop */}
+
+            <motion.div
+              className="absolute inset-0 bg-slate-950/65 backdrop-blur-md"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
+
+            {/* Modal */}
+
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="admission-action-title"
+              initial={{
+                opacity: 0,
+                scale: 0.94,
+                y: 24,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                scale: 0.96,
+                y: 16,
+              }}
+              transition={{
+                duration: 0.22,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-2xl"
+              onMouseDown={(event) =>
+                event.stopPropagation()
+              }
+            >
+              {/* Top accent */}
+
+              <div
+                className={`h-1.5 w-full ${
+                  actionModal === "approve"
+                    ? "bg-emerald-500"
+                    : "bg-red-500"
+                }`}
+              />
+
+              <div className="p-6 sm:p-7">
+                {/* Header */}
+
+                <div className="flex items-start justify-between gap-4">
+                  <div
+                    className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${
+                      actionModal ===
+                      "approve"
+                        ? "bg-emerald-50 text-emerald-600"
+                        : "bg-red-50 text-red-600"
+                    }`}
+                  >
+                    {actionModal ===
+                    "approve" ? (
+                      <CheckCircle2 className="h-7 w-7" />
+                    ) : (
+                      <XCircle className="h-7 w-7" />
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    aria-label="Close confirmation dialog"
+                    disabled={processing}
+                    onClick={
+                      closeActionModal
+                    }
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Heading */}
+
+                <div className="mt-6">
+                  <p
+                    className={`text-[11px] font-bold uppercase tracking-[0.18em] ${
+                      actionModal ===
+                      "approve"
+                        ? "text-emerald-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {actionModal ===
+                    "approve"
+                      ? "Admission Approval"
+                      : "Admission Rejection"}
+                  </p>
+
+                  <h2
+                    id="admission-action-title"
+                    className="mt-2 text-2xl font-bold tracking-tight text-slate-950"
+                  >
+                    {actionModal ===
+                    "approve"
+                      ? "Approve this application?"
+                      : "Reject this application?"}
+                  </h2>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    {actionModal ===
+                    "approve"
+                      ? "Please review the applicant information below before confirming the admission decision."
+                      : "Please confirm that you want to reject this application. The applicant will be notified of the decision."}
+                  </p>
+                </div>
+
+                {/* Applicant Card */}
+
+                <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                  <div className="flex items-center gap-3 p-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-navy text-sm font-bold text-white shadow-sm">
+                      {getApplicantInitials(
+                        application,
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-900">
+                        {getApplicantName(
+                          application,
+                        )}
+                      </p>
+
+                      <p className="mt-0.5 truncate font-mono text-xs text-slate-500">
+                        {
+                          application.applicationNumber
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 border-t border-slate-200 bg-white">
+                    <div className="min-w-0 border-r border-slate-100 p-3.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                        Programme
+                      </p>
+
+                      <p className="mt-1 truncate text-xs font-semibold text-slate-700">
+                        {getProgrammeName(
+                          application.programme,
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="min-w-0 p-3.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                        Status
+                      </p>
+
+                      <p className="mt-1 text-xs font-semibold text-slate-700">
+                        {
+                          statusConfig[
+                            application.status
+                          ].label
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Approval Information */}
+
+                {actionModal ===
+                  "approve" && (
+                  <motion.div
+                    initial={{
+                      opacity: 0,
+                      y: 8,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    className="mt-4 flex gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
+                      <ShieldCheck className="h-4 w-4" />
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-bold text-emerald-800">
+                        What will happen?
+                      </p>
+
+                      <p className="mt-1 text-xs leading-5 text-emerald-700">
+                        A student account will be
+                        created, a matric number will
+                        be generated, and the applicant
+                        will receive an approval
+                        notification.
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Rejection Reason */}
+
+                {actionModal ===
+                  "reject" && (
+                  <motion.div
+                    initial={{
+                      opacity: 0,
+                      y: 8,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-4"
+                  >
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-4 w-4 text-red-600" />
+
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-red-600">
+                        Rejection Reason
+                      </p>
+                    </div>
+
+                    <p className="mt-2 text-sm leading-6 text-red-800">
+                      {rejectionReason.trim()}
+                    </p>
+                  </motion.div>
+                )}
+
+                {/* Warning */}
+
+                <div className="mt-5 flex items-start gap-2.5">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+
+                  <p className="text-[11px] leading-5 text-slate-400">
+                    This action changes the
+                    application's status and will
+                    become part of the admission
+                    workflow.
+                  </p>
+                </div>
+
+                {/* Buttons */}
+
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    disabled={processing}
+                    onClick={
+                      closeActionModal
+                    }
+                    className="flex h-12 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={processing}
+                    onClick={
+                      actionModal ===
+                      "approve"
+                        ? approveApplication
+                        : rejectApplication
+                    }
+                    className={`flex h-12 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold text-white shadow-lg transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                      actionModal ===
+                      "approve"
+                        ? "bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-700"
+                        : "bg-red-600 shadow-red-600/20 hover:bg-red-700"
+                    }`}
+                  >
+                    {processing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Processing
+                      </>
+                    ) : actionModal ===
+                      "approve" ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        Confirm Approval
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4" />
+                        Confirm Rejection
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Footer */}
+
+                <div className="mt-5 flex items-center justify-center gap-2 text-[10px] font-medium text-slate-400">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+
+                  <span>
+                    ITMT secure admission workflow
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1483,4 +1979,3 @@ function TimelineItem({
     </div>
   );
 }
-

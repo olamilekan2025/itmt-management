@@ -489,22 +489,46 @@
 //   },
 // };
 
-
-
 import type { NextAuthOptions } from "next-auth";
+
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
+
 import { z } from "zod";
 
 import type { UserRole } from "./types/next-auth";
 
+/* ============================================================
+   LOGIN VALIDATION
+============================================================ */
+
 const loginSchema = z.object({
-  email: z.string().trim().email("Invalid email address").optional(),
-  password: z.string().min(1, "Password is required"),
-  matricNumber: z.string().trim().optional(),
-  otp: z.string().trim().optional(),
+  email: z
+    .string()
+    .trim()
+    .email("Invalid email address")
+    .optional(),
+
+  password: z
+    .string()
+    .min(1, "Password is required"),
+
+  matricNumber: z
+    .string()
+    .trim()
+    .optional(),
+
+  otp: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "OTP must be a 6-digit code")
+    .optional(),
 });
+
+/* ============================================================
+   API URL
+============================================================ */
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -518,15 +542,24 @@ function getApiUrl(): string {
   return API_URL.replace(/\/+$/, "");
 }
 
+/* ============================================================
+   NEXTAUTH OPTIONS
+============================================================ */
+
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
 
+  /* ==========================================================
+     PROVIDERS
+  ========================================================== */
+
   providers: [
-    // ============================================================
-    // CREDENTIALS LOGIN
-    // ============================================================
+    /* ========================================================
+       CREDENTIALS LOGIN
+    ======================================================== */
+
     CredentialsProvider({
       name: "Credentials",
 
@@ -535,14 +568,17 @@ export const authOptions: NextAuthOptions = {
           label: "Email",
           type: "email",
         },
+
         matricNumber: {
           label: "Matric Number",
           type: "text",
         },
+
         password: {
           label: "Password",
           type: "password",
         },
+
         otp: {
           label: "OTP",
           type: "text",
@@ -550,7 +586,12 @@ export const authOptions: NextAuthOptions = {
       },
 
       async authorize(credentials) {
-        const parsed = loginSchema.safeParse(credentials);
+        /* ----------------------------------------------------
+           Validate credentials
+        ---------------------------------------------------- */
+
+        const parsed =
+          loginSchema.safeParse(credentials);
 
         if (!parsed.success) {
           console.error(
@@ -571,12 +612,16 @@ export const authOptions: NextAuthOptions = {
         try {
           const apiUrl = getApiUrl();
 
-          // ========================================================
-          // STUDENT LOGIN
-          // ========================================================
+          /* ==================================================
+             STUDENT LOGIN
+             Matric Number + Password
+          ================================================== */
+
           if (matricNumber) {
             const normalizedMatricNumber =
-              matricNumber.trim().toUpperCase();
+              matricNumber
+                .trim()
+                .toUpperCase();
 
             console.log(
               "NextAuth: authenticating student:",
@@ -584,16 +629,22 @@ export const authOptions: NextAuthOptions = {
             );
 
             const response = await fetch(
-              `${apiUrl}/auth/student/login`,
+              `${apiUrl}/api/auth/student/login`,
               {
                 method: "POST",
+
                 headers: {
-                  "Content-Type": "application/json",
+                  "Content-Type":
+                    "application/json",
                 },
+
                 body: JSON.stringify({
-                  matricNumber: normalizedMatricNumber,
+                  matricNumber:
+                    normalizedMatricNumber,
+
                   password,
                 }),
+
                 cache: "no-store",
               },
             );
@@ -603,26 +654,35 @@ export const authOptions: NextAuthOptions = {
               response.status,
             );
 
-            if (!response.ok) {
-              const errorText = await response.text();
+            const data =
+              await response.json().catch(
+                () => null,
+              );
 
+            if (!response.ok) {
               console.error(
                 "Student login failed:",
-                response.status,
-                errorText,
+                {
+                  status:
+                    response.status,
+                  data,
+                },
               );
 
               return null;
             }
 
-            const data = await response.json();
-
             console.log(
               "NEXTAUTH STUDENT LOGIN RESPONSE:",
               {
-                success: data?.success,
-                userId: data?.user?.id,
-                role: data?.user?.role,
+                success:
+                  data?.success,
+
+                userId:
+                  data?.user?.id,
+
+                role:
+                  data?.user?.role,
               },
             );
 
@@ -640,47 +700,80 @@ export const authOptions: NextAuthOptions = {
             }
 
             return {
-              id: String(data.user.id),
+              id: String(
+                data.user.id,
+              ),
+
               name:
                 data.user.name ||
                 normalizedMatricNumber,
-              email: data.user.email || null,
-              role: data.user.role as UserRole,
+
+              email:
+                data.user.email ||
+                null,
+
+              role:
+                data.user.role as UserRole,
+
               matricNumber:
                 data.user.matricNumber ||
                 normalizedMatricNumber,
-              accessToken: String(data.token),
+
+              accessToken:
+                String(data.token),
             };
           }
 
-          // ========================================================
-          // STAFF LOGIN
-          // ========================================================
+          /* ==================================================
+             STAFF / ADMIN LOGIN
+             Email + Password + OTP
+          ================================================== */
+
           if (email) {
             const normalizedEmail =
-              email.trim().toLowerCase();
+              email
+                .trim()
+                .toLowerCase();
+
+            const normalizedOtp =
+              otp?.trim();
 
             console.log(
               "NextAuth: authenticating staff:",
               normalizedEmail,
             );
 
+            console.log(
+              "NextAuth: OTP supplied:",
+              normalizedOtp
+                ? "YES"
+                : "NO",
+            );
+
             const response = await fetch(
-              `${apiUrl}/auth/login`,
+              `${apiUrl}/api/auth/login`,
               {
                 method: "POST",
+
                 headers: {
-                  "Content-Type": "application/json",
+                  "Content-Type":
+                    "application/json",
                 },
+
                 body: JSON.stringify({
-                  email: normalizedEmail,
+                  email:
+                    normalizedEmail,
+
                   password,
-                  ...(otp
+
+                  ...(normalizedOtp
                     ? {
-                        otp: otp.trim(),
+                        otp:
+                          normalizedOtp,
                       }
                     : {}),
                 }),
+
                 cache: "no-store",
               },
             );
@@ -690,27 +783,39 @@ export const authOptions: NextAuthOptions = {
               response.status,
             );
 
-            if (!response.ok) {
-              const errorText = await response.text();
+            const data =
+              await response.json().catch(
+                () => null,
+              );
 
+            if (!response.ok) {
               console.error(
                 "Staff login failed:",
-                response.status,
-                errorText,
+                {
+                  status:
+                    response.status,
+
+                  data,
+                },
               );
 
               return null;
             }
 
-            const data = await response.json();
-
             console.log(
               "NEXTAUTH STAFF LOGIN RESPONSE:",
               {
-                success: data?.success,
-                userId: data?.user?.id,
-                role: data?.user?.role,
-                email: data?.user?.email,
+                success:
+                  data?.success,
+
+                userId:
+                  data?.user?.id,
+
+                role:
+                  data?.user?.role,
+
+                email:
+                  data?.user?.email,
               },
             );
 
@@ -728,17 +833,29 @@ export const authOptions: NextAuthOptions = {
             }
 
             return {
-              id: String(data.user.id),
+              id: String(
+                data.user.id,
+              ),
+
               name:
                 data.user.name ||
                 normalizedEmail,
+
               email:
                 data.user.email ||
                 normalizedEmail,
-              role: data.user.role as UserRole,
-              accessToken: String(data.token),
+
+              role:
+                data.user.role as UserRole,
+
+              accessToken:
+                String(data.token),
             };
           }
+
+          /* --------------------------------------------------
+             No login identity supplied
+          -------------------------------------------------- */
 
           console.error(
             "NextAuth: no email or matric number supplied.",
@@ -756,48 +873,67 @@ export const authOptions: NextAuthOptions = {
       },
     }),
 
-    // ============================================================
-    // GOOGLE
-    // ============================================================
+    /* ========================================================
+       GOOGLE
+    ======================================================== */
+
     GoogleProvider({
       clientId:
         process.env.GOOGLE_CLIENT_ID || "",
+
       clientSecret:
         process.env.GOOGLE_CLIENT_SECRET || "",
     }),
 
-    // ============================================================
-    // FACEBOOK
-    // ============================================================
+    /* ========================================================
+       FACEBOOK
+    ======================================================== */
+
     FacebookProvider({
       clientId:
         process.env.FACEBOOK_CLIENT_ID || "",
+
       clientSecret:
         process.env.FACEBOOK_CLIENT_SECRET || "",
     }),
   ],
 
+  /* ==========================================================
+     CALLBACKS
+  ========================================================== */
+
   callbacks: {
-    // ============================================================
-    // JWT CALLBACK
-    // ============================================================
+    /* ========================================================
+       JWT CALLBACK
+    ======================================================== */
+
     async jwt({
       token,
       user,
       account,
     }) {
-      console.log("NEXTAUTH JWT CALLBACK:", {
-        provider: account?.provider,
-        userId: user?.id,
-        role: user?.role,
-      });
+      console.log(
+        "NEXTAUTH JWT CALLBACK:",
+        {
+          provider:
+            account?.provider,
 
-      // ----------------------------------------------------------
-      // CREDENTIALS
-      // ----------------------------------------------------------
+          userId:
+            user?.id,
+
+          role:
+            user?.role,
+        },
+      );
+
+      /* ------------------------------------------------------
+         CREDENTIALS LOGIN
+      ------------------------------------------------------ */
+
       if (
         user &&
-        account?.provider === "credentials"
+        account?.provider ===
+          "credentials"
       ) {
         token.id = user.id;
 
@@ -813,48 +949,72 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // ----------------------------------------------------------
-      // GOOGLE / FACEBOOK
-      // ----------------------------------------------------------
+      /* ------------------------------------------------------
+         GOOGLE / FACEBOOK LOGIN
+      ------------------------------------------------------ */
+
       if (
         user &&
         (
-          account?.provider === "google" ||
-          account?.provider === "facebook"
+          account?.provider ===
+            "google" ||
+          account?.provider ===
+            "facebook"
         )
       ) {
         try {
-          const apiUrl = getApiUrl();
+          const apiUrl =
+            getApiUrl();
 
-          const response = await fetch(
-            `${apiUrl}/auth/oauth-login`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type":
-                  "application/json",
+          const response =
+            await fetch(
+              `${apiUrl}/api/auth/oauth-login`,
+              {
+                method: "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+
+                body: JSON.stringify({
+                  email:
+                    user.email,
+
+                  name:
+                    user.name,
+
+                  provider:
+                    account.provider,
+                }),
+
+                cache: "no-store",
               },
-              body: JSON.stringify({
-                email: user.email,
-                name: user.name,
-                provider:
-                  account.provider,
-              }),
-              cache: "no-store",
-            },
+            );
+
+          console.log(
+            "NextAuth OAuth backend status:",
+            response.status,
           );
+
+          const data =
+            await response
+              .json()
+              .catch(() => null);
 
           if (!response.ok) {
             console.error(
               "OAuth backend login failed:",
-              response.status,
+              {
+                status:
+                  response.status,
+
+                data,
+              },
             );
 
             return token;
           }
-
-          const data =
-            await response.json();
 
           if (
             !data?.user?.id ||
@@ -870,20 +1030,25 @@ export const authOptions: NextAuthOptions = {
           }
 
           token.id =
-            String(data.user.id);
+            String(
+              data.user.id,
+            );
 
           token.role =
             data.user.role as UserRole;
 
           token.accessToken =
-            String(data.token);
+            String(
+              data.token,
+            );
 
           if (
             data.user.matricNumber
           ) {
             token.matricNumber =
               String(
-                data.user.matricNumber,
+                data.user
+                  .matricNumber,
               );
           }
         } catch (error) {
@@ -897,9 +1062,10 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
 
-    // ============================================================
-    // SESSION CALLBACK
-    // ============================================================
+    /* ========================================================
+       SESSION CALLBACK
+    ======================================================== */
+
     async session({
       session,
       token,
@@ -907,16 +1073,20 @@ export const authOptions: NextAuthOptions = {
       console.log(
         "NEXTAUTH SESSION CALLBACK:",
         {
-          tokenId: token.id,
-          role: token.role,
+          tokenId:
+            token.id,
+
+          role:
+            token.role,
         },
       );
 
-      session.user.id = String(
-        token.id ||
-          token.sub ||
-          "",
-      );
+      session.user.id =
+        String(
+          token.id ||
+            token.sub ||
+            "",
+        );
 
       session.user.role =
         token.role as UserRole;
@@ -927,7 +1097,8 @@ export const authOptions: NextAuthOptions = {
             token.matricNumber,
           );
       } else {
-        delete session.user.matricNumber;
+        delete session.user
+          .matricNumber;
       }
 
       if (token.accessToken) {
@@ -941,12 +1112,25 @@ export const authOptions: NextAuthOptions = {
     },
   },
 
+  /* ==========================================================
+     AUTH PAGES
+  ========================================================== */
+
   pages: {
     signIn: "/auth/login",
   },
 
-  // Important for debugging and stable JWT sessions.
-  debug: process.env.NODE_ENV === "development",
+  /* ==========================================================
+     DEBUG
+  ========================================================== */
+
+  debug:
+    process.env.NODE_ENV ===
+    "development",
+
+  /* ==========================================================
+     SECRET
+  ========================================================== */
 
   secret:
     process.env.NEXTAUTH_SECRET,

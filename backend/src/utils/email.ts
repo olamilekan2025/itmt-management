@@ -1,114 +1,39 @@
-// import nodemailer from "nodemailer";
-
-// let transporter: nodemailer.Transporter | null = null;
-
-// function getTransporter(): nodemailer.Transporter {
-//   if (!transporter) {
-//     const user = process.env.EMAIL_USER;
-//     const pass = process.env.EMAIL_APP_PASSWORD;
-
-//     if (!user || !pass) {
-//       throw new Error(
-//         "EMAIL_USER or EMAIL_APP_PASSWORD is not set in .env — cannot send email.",
-//       );
-//     }
-
-//     transporter = nodemailer.createTransport({
-//       service: "gmail",
-//       auth: { user, pass },
-//     });
-//   }
-
-//   return transporter;
-// }
-
-// function getFromAddress(): string {
-//   return process.env.EMAIL_USER || "";
-// }
-
-// export async function sendVerificationEmail(to: string, name: string, link: string) {
-//   const transport = getTransporter();
-
-//   await transport.sendMail({
-//     from: `ITMT Management System <${getFromAddress()}>`,
-//     to,
-//     subject: "Verify your ITMT account email",
-//     html: `
-//       <p>Hi ${name},</p>
-//       <p>Thanks for registering with the ITMT Management System. Please verify your email address by clicking the link below:</p>
-//       <p><a href="${link}">Verify my email</a></p>
-//       <p>This link expires in 24 hours. If you didn't create this account, you can ignore this email.</p>
-//     `,
-//   });
-// }
-
-// export async function sendOtpEmail(to: string, name: string, otp: string) {
-//   const transport = getTransporter();
-
-//   await transport.sendMail({
-//     from: `ITMT Management System <${getFromAddress()}>`,
-//     to,
-//     subject: "Your ITMT login code",
-//     html: `
-//       <p>Hi ${name},</p>
-//       <p>Your one-time login code is:</p>
-//       <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px;">${otp}</p>
-//       <p>This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>
-//     `,
-//   });
-// }
-
-// export async function sendPasswordResetEmail(to: string, name: string, link: string) {
-//   const transport = getTransporter();
-
-//   await transport.sendMail({
-//     from: `ITMT Management System <${getFromAddress()}>`,
-//     to,
-//     subject: "Reset your ITMT password",
-//     html: `
-//       <p>Hi ${name},</p>
-//       <p>We received a request to reset your password. Click the link below to choose a new one:</p>
-//       <p><a href="${link}">Reset my password</a></p>
-//       <p>This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
-//     `,
-//   });
-// }
-
-
-// export async function sendContactNotificationEmail(
-//   name: string,
-//   email: string,
-//   subject: string,
-//   message: string,
-// ) {
-//   const transport = getTransporter();
-//   const notifyTo = process.env.EMAIL_USER || "";
-
-//   await transport.sendMail({
-//     from: `ITMT Management System <${getFromAddress()}>`,
-//     to: notifyTo,
-//     replyTo: email,
-//     subject: `New contact form message: ${subject}`,
-//     html: `
-//       <p><strong>From:</strong> ${name} (${email})</p>
-//       <p><strong>Subject:</strong> ${subject}</p>
-//       <p><strong>Message:</strong></p>
-//       <p>${message.replace(/\n/g, "<br />")}</p>
-//     `,
-//   });
-// }
-
-
-
 import { Resend } from "resend";
+
+/* =========================================================
+   RESEND CONFIGURATION
+========================================================= */
 
 const resendApiKey = process.env.RESEND_API_KEY;
 
 if (!resendApiKey) {
-  throw new Error("RESEND_API_KEY is not configured.");
+  throw new Error(
+    "RESEND_API_KEY is not configured",
+  );
 }
 
 const resend = new Resend(resendApiKey);
+
+/* =========================================================
+   TYPES
+========================================================= */
+
+interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+}
+
+interface SendEmailOptions {
+  to: string;
+  subject: string;
+  html: string;
+  replyTo?: string;
+  attachments?: EmailAttachment[];
+}
+
+/* =========================================================
+   EMAIL CONFIGURATION
+========================================================= */
 
 function getFromAddress(): string {
   return (
@@ -117,383 +42,1158 @@ function getFromAddress(): string {
   );
 }
 
+/* =========================================================
+   HTML ESCAPING
+========================================================= */
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/* =========================================================
+   EMAIL VALIDATION
+========================================================= */
+
+function validateEmailAddress(email: string): void {
+  const normalized = email.trim();
+
+  if (!normalized) {
+    throw new Error(
+      "Recipient email address is required",
+    );
+  }
+
+  const emailPattern =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailPattern.test(normalized)) {
+    throw new Error(
+      `Invalid recipient email address: ${email}`,
+    );
+  }
+}
+
+/* =========================================================
+   SEND EMAIL
+========================================================= */
+
 async function sendEmail({
   to,
   subject,
   html,
   replyTo,
-}: {
-  to: string;
-  subject: string;
-  html: string;
-  replyTo?: string;
-}) {
-  const { data, error } = await resend.emails.send({
-    from: getFromAddress(),
-    to: [to],
-    subject,
-    html,
-    ...(replyTo ? { replyTo } : {}),
-  });
+  attachments,
+}: SendEmailOptions): Promise<void> {
+  const recipient = to.trim();
+  const from = getFromAddress();
 
-  if (error) {
-    console.error("Resend email error:", error);
-    throw new Error(error.message || "Failed to send email.");
+  validateEmailAddress(recipient);
+
+  if (!subject.trim()) {
+    throw new Error(
+      "Email subject is required",
+    );
   }
 
-  console.log("Email sent successfully:", data?.id);
+  if (!html.trim()) {
+    throw new Error(
+      "Email HTML content is required",
+    );
+  }
 
-  return data;
+  console.log("[RESEND] Sending email", {
+    to: recipient,
+    subject,
+    from,
+    attachments:
+      attachments?.length || 0,
+  });
+
+  try {
+    const { data, error } =
+      await resend.emails.send({
+        from,
+        to: recipient,
+        subject,
+        html,
+        ...(replyTo?.trim()
+          ? {
+              replyTo: replyTo.trim(),
+            }
+          : {}),
+        ...(attachments?.length
+          ? {
+              attachments: attachments.map(
+                (attachment) => ({
+                  filename:
+                    attachment.filename,
+                  content:
+                    attachment.content,
+                }),
+              ),
+            }
+          : {}),
+      });
+
+    if (error) {
+      console.error(
+        "[RESEND] Email send failed",
+        {
+          to: recipient,
+          subject,
+          from,
+          error,
+        },
+      );
+
+      throw new Error(
+        error.message ||
+          "Resend failed to send the email",
+      );
+    }
+
+    console.log(
+      "[RESEND] Email accepted successfully",
+      {
+        id: data?.id,
+        to: recipient,
+        subject,
+        from,
+        attachments:
+          attachments?.length || 0,
+      },
+    );
+  } catch (error) {
+    console.error(
+      "[RESEND] Unexpected email error",
+      {
+        to: recipient,
+        subject,
+        from,
+        error,
+      },
+    );
+
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error(
+      "Failed to send email",
+    );
+  }
 }
+
+/* =========================================================
+   EMAIL LAYOUT
+========================================================= */
+
+function emailLayout({
+  title,
+  preheader,
+  content,
+}: {
+  title: string;
+  preheader?: string;
+  content: string;
+}): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+  <title>${escapeHtml(title)}</title>
+</head>
+
+<body
+  style="
+    margin:0;
+    padding:0;
+    background:#f4f7fb;
+    font-family:Arial,Helvetica,sans-serif;
+    color:#172033;
+  "
+>
+  ${
+    preheader
+      ? `
+        <div
+          style="
+            display:none;
+            max-height:0;
+            overflow:hidden;
+            opacity:0;
+            color:transparent;
+          "
+        >
+          ${escapeHtml(preheader)}
+        </div>
+      `
+      : ""
+  }
+
+  <table
+    width="100%"
+    cellpadding="0"
+    cellspacing="0"
+    border="0"
+    style="
+      background:#f4f7fb;
+      padding:32px 16px;
+    "
+  >
+    <tr>
+      <td align="center">
+
+        <table
+          width="100%"
+          cellpadding="0"
+          cellspacing="0"
+          border="0"
+          style="
+            max-width:620px;
+            background:#ffffff;
+            border-radius:16px;
+            overflow:hidden;
+            border:1px solid #e6eaf0;
+          "
+        >
+
+          <!-- HEADER -->
+
+          <tr>
+            <td
+              style="
+                padding:30px 32px;
+                background:#0f172a;
+              "
+            >
+              <div
+                style="
+                  font-size:12px;
+                  font-weight:700;
+                  letter-spacing:1.8px;
+                  color:#bfdbfe;
+                  text-transform:uppercase;
+                  margin-bottom:8px;
+                "
+              >
+                ITMT Academy
+              </div>
+
+              <div
+                style="
+                  font-size:26px;
+                  line-height:1.25;
+                  font-weight:700;
+                  color:#ffffff;
+                "
+              >
+                ${escapeHtml(title)}
+              </div>
+            </td>
+          </tr>
+
+          <!-- CONTENT -->
+
+          <tr>
+            <td
+              style="
+                padding:34px 32px;
+                font-size:15px;
+                line-height:1.7;
+                color:#374151;
+              "
+            >
+              ${content}
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+
+          <tr>
+            <td
+              style="
+                padding:24px 32px;
+                border-top:1px solid #edf0f4;
+                background:#fafbfc;
+              "
+            >
+              <div
+                style="
+                  font-size:13px;
+                  line-height:1.6;
+                  color:#6b7280;
+                "
+              >
+                This is an automated message from the
+                <strong style="color:#374151;">
+                  ITMT Management System
+                </strong>.
+                Please do not reply to this email unless instructed.
+              </div>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
+`;
+}
+
+/* =========================================================
+   VERIFY EMAIL
+========================================================= */
 
 export async function sendVerificationEmail(
   to: string,
   name: string,
-  link: string,
-) {
-  return sendEmail({
-    to,
-    subject: "Verify your ITMT account email",
-    html: `
-      <div style="
-        font-family: Arial, sans-serif;
-        max-width: 600px;
-        margin: 0 auto;
-        padding: 32px;
-        color: #1f2937;
-      ">
-        <h2 style="color: #0f172a;">
-          Welcome to ITMT, ${name}
-        </h2>
+  verificationLink: string,
+): Promise<void> {
+  const safeName = escapeHtml(name);
+  const safeLink = escapeHtml(
+    verificationLink,
+  );
 
-        <p>
-          Thank you for creating your ITMT Management System account.
-        </p>
+  const html = emailLayout({
+    title: "Verify Your Email",
+    preheader:
+      "Verify your ITMT Management System account.",
+    content: `
+      <p style="margin:0 0 18px;">
+        Hello <strong>${safeName}</strong>,
+      </p>
 
-        <p>
-          Please verify your email address by clicking the button below.
-        </p>
+      <p style="margin:0 0 22px;">
+        Thank you for registering with ITMT Management System.
+        Please verify your email address to continue.
+      </p>
 
-        <p style="margin: 30px 0;">
-          <a
-            href="${link}"
-            style="
-              display: inline-block;
-              background: #0f172a;
-              color: white;
-              padding: 12px 24px;
-              text-decoration: none;
-              border-radius: 8px;
-              font-weight: 600;
-            "
-          >
-            Verify Email
-          </a>
-        </p>
-
-        <p style="font-size: 14px; color: #64748b;">
-          If you did not create this account, you can safely ignore this email.
-        </p>
-
-        <p style="font-size: 13px; color: #94a3b8;">
-          ITMT Management System
-        </p>
+      <div style="text-align:center;margin:30px 0;">
+        <a
+          href="${safeLink}"
+          style="
+            display:inline-block;
+            padding:13px 24px;
+            background:#1d4ed8;
+            color:#ffffff;
+            text-decoration:none;
+            border-radius:9px;
+            font-weight:700;
+          "
+        >
+          Verify Email
+        </a>
       </div>
+
+      <p
+        style="
+          margin:0;
+          font-size:13px;
+          color:#6b7280;
+        "
+      >
+        If you did not create this account, you can safely
+        ignore this email.
+      </p>
     `,
+  });
+
+  await sendEmail({
+    to,
+    subject:
+      "Verify your ITMT Management System email",
+    html,
   });
 }
 
-// export async function sendOtpEmail(
-//   to: string,
-//   name: string,
-//   otp: string,
-// ) {
-//   return sendEmail({
-//     to,
-//     subject: "Your ITMT login verification code",
-//     html: `
-//       <div style="
-//         font-family: Arial, sans-serif;
-//         max-width: 600px;
-//         margin: 0 auto;
-//         padding: 32px;
-//         color: #1f2937;
-//       ">
-//         <div style="
-//           background: #0f172a;
-//           color: white;
-//           padding: 24px;
-//           border-radius: 12px 12px 0 0;
-//           text-align: center;
-//         ">
-//           <h1 style="margin: 0; font-size: 24px;">
-//             ITMT Management System
-//           </h1>
-//         </div>
-
-//         <div style="
-//           border: 1px solid #e5e7eb;
-//           border-top: none;
-//           padding: 32px;
-//           border-radius: 0 0 12px 12px;
-//         ">
-//           <h2 style="margin-top: 0;">
-//             Hello ${name},
-//           </h2>
-
-//           <p>
-//             Use the verification code below to complete your login:
-//           </p>
-
-//           <div style="
-//             margin: 28px 0;
-//             padding: 20px;
-//             background: #f8fafc;
-//             border: 1px solid #e2e8f0;
-//             border-radius: 10px;
-//             text-align: center;
-//           ">
-//             <span style="
-//               font-size: 32px;
-//               font-weight: 700;
-//               letter-spacing: 8px;
-//               color: #0f172a;
-//             ">
-//               ${otp}
-//             </span>
-//           </div>
-
-//           <p style="font-size: 14px; color: #64748b;">
-//             This verification code is for your ITMT account login.
-//             Do not share it with anyone.
-//           </p>
-
-//           <p style="font-size: 14px; color: #64748b;">
-//             If you did not attempt to log in, you can safely ignore this email.
-//           </p>
-//         </div>
-
-//         <p style="
-//           text-align: center;
-//           font-size: 12px;
-//           color: #94a3b8;
-//           margin-top: 24px;
-//         ">
-//           © ITMT Management System
-//         </p>
-//       </div>
-//     `,
-//   });
-// }
-
-
-
-
-
+/* =========================================================
+   OTP EMAIL
+========================================================= */
 
 export async function sendOtpEmail(
   to: string,
   name: string,
   otp: string,
-) {
-  // TEMPORARY DEVELOPMENT SETUP:
-  // Resend's testing sender can only send to the
-  // verified/test recipient. Remove this variable
-  // when a real domain is verified in Resend.
-  const otpRecipient = process.env.OTP_TEST_RECIPIENT || to;
+): Promise<void> {
+  const otpRecipient =
+    process.env.OTP_TEST_RECIPIENT?.trim() ||
+    to.trim();
 
-  console.log(
-    `Sending login OTP to: ${otpRecipient}${
-      otpRecipient !== to ? ` (actual user email: ${to})` : ""
-    }`,
-  );
+  const safeName = escapeHtml(name);
+  const safeOtp = escapeHtml(otp);
 
-  return sendEmail({
-    to: otpRecipient,
-    subject: "Your ITMT login verification code",
-    html: `
-      <div style="
-        font-family: Arial, sans-serif;
-        max-width: 600px;
-        margin: 0 auto;
-        padding: 32px;
-        color: #1f2937;
-      ">
-        <div style="
-          background: #0f172a;
-          color: white;
-          padding: 24px;
-          border-radius: 12px 12px 0 0;
-          text-align: center;
-        ">
-          <h1 style="margin: 0; font-size: 24px;">
-            ITMT Management System
-          </h1>
+  console.log("[EMAIL] Sending OTP", {
+    originalRecipient: to,
+    actualRecipient: otpRecipient,
+    redirected:
+      otpRecipient.toLowerCase() !==
+      to.trim().toLowerCase(),
+  });
+
+  const html = emailLayout({
+    title:
+      "Your Login Verification Code",
+    preheader:
+      "Your ITMT login verification code.",
+    content: `
+      <p style="margin:0 0 18px;">
+        Hello <strong>${safeName}</strong>,
+      </p>
+
+      <p style="margin:0 0 22px;">
+        Use the verification code below to complete your login:
+      </p>
+
+      <div
+        style="
+          margin:25px 0;
+          padding:20px;
+          text-align:center;
+          background:#f1f5f9;
+          border:1px solid #e2e8f0;
+          border-radius:12px;
+        "
+      >
+        <div
+          style="
+            font-size:32px;
+            font-weight:800;
+            letter-spacing:8px;
+            color:#0f172a;
+          "
+        >
+          ${safeOtp}
         </div>
-
-        <div style="
-          border: 1px solid #e5e7eb;
-          border-top: none;
-          padding: 32px;
-          border-radius: 0 0 12px 12px;
-        ">
-          <h2 style="margin-top: 0;">
-            Hello ${name},
-          </h2>
-
-          <p>
-            Use the verification code below to complete your login:
-          </p>
-
-          <div style="
-            margin: 28px 0;
-            padding: 20px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            text-align: center;
-          ">
-            <span style="
-              font-size: 32px;
-              font-weight: 700;
-              letter-spacing: 8px;
-              color: #0f172a;
-            ">
-              ${otp}
-            </span>
-          </div>
-
-          <p style="font-size: 14px; color: #64748b;">
-            This verification code is for your ITMT account login.
-            Do not share it with anyone.
-          </p>
-
-          <p style="font-size: 14px; color: #64748b;">
-            If you did not attempt to log in, you can safely ignore this email.
-          </p>
-        </div>
-
-        <p style="
-          text-align: center;
-          font-size: 12px;
-          color: #94a3b8;
-          margin-top: 24px;
-        ">
-          © ITMT Management System
-        </p>
       </div>
+
+      <p
+        style="
+          margin:0;
+          font-size:13px;
+          color:#6b7280;
+        "
+      >
+        This code expires shortly. Never share your
+        verification code with anyone.
+      </p>
     `,
   });
+
+  await sendEmail({
+    to: otpRecipient,
+    subject:
+      "Your ITMT login verification code",
+    html,
+  });
 }
+
+/* =========================================================
+   PASSWORD RESET / STUDENT ACTIVATION
+========================================================= */
 
 export async function sendPasswordResetEmail(
   to: string,
   name: string,
-  link: string,
-) {
-  return sendEmail({
-    to,
-    subject: "Reset your ITMT password",
-    html: `
-      <div style="
-        font-family: Arial, sans-serif;
-        max-width: 600px;
-        margin: 0 auto;
-        padding: 32px;
-        color: #1f2937;
-      ">
-        <h2 style="color: #0f172a;">
-          Password Reset
-        </h2>
+  resetLink: string,
+): Promise<void> {
+  const safeName = escapeHtml(name);
+  const safeLink = escapeHtml(resetLink);
 
-        <p>
-          Hello ${name},
-        </p>
+  const html = emailLayout({
+    title:
+      "Activate Your Student Account",
+    preheader:
+      "Set your password and activate your ITMT student account.",
+    content: `
+      <p style="margin:0 0 18px;">
+        Hello <strong>${safeName}</strong>,
+      </p>
 
-        <p>
-          We received a request to reset your ITMT Management System password.
-        </p>
+      <p style="margin:0 0 18px;">
+        Your ITMT student account has been created.
+        Please use the button below to set your password
+        and activate your account.
+      </p>
 
-        <p style="margin: 30px 0;">
-          <a
-            href="${link}"
-            style="
-              display: inline-block;
-              background: #0f172a;
-              color: white;
-              padding: 12px 24px;
-              text-decoration: none;
-              border-radius: 8px;
-              font-weight: 600;
-            "
-          >
-            Reset Password
-          </a>
-        </p>
-
-        <p style="font-size: 14px; color: #64748b;">
-          If you did not request a password reset, you can safely ignore this email.
-        </p>
+      <div style="text-align:center;margin:30px 0;">
+        <a
+          href="${safeLink}"
+          style="
+            display:inline-block;
+            padding:13px 24px;
+            background:#1d4ed8;
+            color:#ffffff;
+            text-decoration:none;
+            border-radius:9px;
+            font-weight:700;
+          "
+        >
+          Activate Account
+        </a>
       </div>
+
+      <p
+        style="
+          margin:0;
+          font-size:13px;
+          color:#6b7280;
+        "
+      >
+        For security reasons, this activation link will expire.
+      </p>
     `,
   });
+
+  await sendEmail({
+    to,
+    subject:
+      "Activate your ITMT student account",
+    html,
+  });
 }
+
+/* =========================================================
+   ADMISSION SUBMITTED
+========================================================= */
+
+export async function sendAdmissionSubmittedEmail(
+  to: string,
+  name: string,
+  applicationNumber: string,
+): Promise<void> {
+  const safeName = escapeHtml(name);
+
+  const safeApplicationNumber =
+    escapeHtml(applicationNumber);
+
+  const html = emailLayout({
+    title:
+      "Application Submitted",
+    preheader:
+      `Your ITMT admission application ${applicationNumber} has been received.`,
+    content: `
+      <p style="margin:0 0 18px;">
+        Hello <strong>${safeName}</strong>,
+      </p>
+
+      <p style="margin:0 0 20px;">
+        Thank you for applying to ITMT Academy.
+        Your admission application has been successfully
+        submitted and is now awaiting review.
+      </p>
+
+      <div
+        style="
+          margin:26px 0;
+          padding:20px;
+          background:#eff6ff;
+          border:1px solid #bfdbfe;
+          border-radius:12px;
+        "
+      >
+        <div
+          style="
+            font-size:12px;
+            font-weight:700;
+            color:#64748b;
+            text-transform:uppercase;
+            letter-spacing:1px;
+            margin-bottom:7px;
+          "
+        >
+          Application Number
+        </div>
+
+        <div
+          style="
+            font-size:22px;
+            font-weight:800;
+            color:#1d4ed8;
+          "
+        >
+          ${safeApplicationNumber}
+        </div>
+      </div>
+
+      <p style="margin:0 0 12px;">
+        <strong>Application Status:</strong>
+
+        <span
+          style="
+            display:inline-block;
+            margin-left:6px;
+            padding:4px 10px;
+            background:#fef3c7;
+            color:#92400e;
+            border-radius:999px;
+            font-size:12px;
+            font-weight:700;
+          "
+        >
+          PENDING
+        </span>
+      </p>
+
+      <p style="margin:20px 0 0;">
+        Please keep your application number for future reference.
+        You will receive another email when your application
+        status changes.
+      </p>
+    `,
+  });
+
+  await sendEmail({
+    to,
+    subject:
+      `ITMT admission application received — ${applicationNumber}`,
+    html,
+  });
+}
+
+/* =========================================================
+   ADMISSION UNDER REVIEW
+========================================================= */
+
+export async function sendAdmissionUnderReviewEmail(
+  to: string,
+  name: string,
+  applicationNumber: string,
+): Promise<void> {
+  const safeName = escapeHtml(name);
+
+  const safeApplicationNumber =
+    escapeHtml(applicationNumber);
+
+  const html = emailLayout({
+    title:
+      "Application Under Review",
+    preheader:
+      `Your ITMT admission application ${applicationNumber} is now under review.`,
+    content: `
+      <p style="margin:0 0 18px;">
+        Hello <strong>${safeName}</strong>,
+      </p>
+
+      <p style="margin:0 0 20px;">
+        We are writing to let you know that your ITMT Academy
+        admission application is now being reviewed by the
+        admissions team.
+      </p>
+
+      <div
+        style="
+          margin:26px 0;
+          padding:20px;
+          background:#f8fafc;
+          border:1px solid #e2e8f0;
+          border-radius:12px;
+        "
+      >
+        <div
+          style="
+            font-size:12px;
+            font-weight:700;
+            color:#64748b;
+            text-transform:uppercase;
+            letter-spacing:1px;
+            margin-bottom:7px;
+          "
+        >
+          Application Number
+        </div>
+
+        <div
+          style="
+            font-size:22px;
+            font-weight:800;
+            color:#0f172a;
+          "
+        >
+          ${safeApplicationNumber}
+        </div>
+      </div>
+
+      <p style="margin:0 0 12px;">
+        <strong>Application Status:</strong>
+
+        <span
+          style="
+            display:inline-block;
+            margin-left:6px;
+            padding:4px 10px;
+            background:#dbeafe;
+            color:#1e40af;
+            border-radius:999px;
+            font-size:12px;
+            font-weight:700;
+          "
+        >
+          UNDER REVIEW
+        </span>
+      </p>
+
+      <p style="margin:20px 0 0;">
+        No action is required from you at this time.
+        We will notify you when a final decision has been made.
+      </p>
+    `,
+  });
+
+  await sendEmail({
+    to,
+    subject:
+      `ITMT admission application under review — ${applicationNumber}`,
+    html,
+  });
+}
+
+/* =========================================================
+   ADMISSION APPROVED
+========================================================= */
+
+export async function sendAdmissionApprovedEmail(
+  to: string,
+  name: string,
+  applicationNumber: string,
+  matricNumber: string,
+  admissionLetterPdf?: Buffer,
+  admissionLetterReference?: string,
+): Promise<void> {
+  const safeName = escapeHtml(name);
+
+  const safeApplicationNumber =
+    escapeHtml(applicationNumber);
+
+  const safeMatricNumber =
+    escapeHtml(matricNumber);
+
+  const safeReference =
+    escapeHtml(
+      admissionLetterReference || "",
+    );
+
+  const letterSection = admissionLetterPdf
+    ? `
+      <div
+        style="
+          margin:28px 0;
+          padding:20px;
+          background:#eff6ff;
+          border:1px solid #bfdbfe;
+          border-radius:12px;
+        "
+      >
+        <div
+          style="
+            font-size:12px;
+            font-weight:700;
+            color:#64748b;
+            text-transform:uppercase;
+            letter-spacing:1px;
+            margin-bottom:7px;
+          "
+        >
+          Official Admission Letter
+        </div>
+
+        <div
+          style="
+            font-size:14px;
+            color:#374151;
+            line-height:1.6;
+          "
+        >
+          Your official ITMT admission letter has been
+          generated and is attached to this email as a
+          PDF document.
+        </div>
+
+        ${
+          safeReference
+            ? `
+              <div
+                style="
+                  margin-top:12px;
+                  font-size:13px;
+                  color:#1d4ed8;
+                  font-weight:700;
+                "
+              >
+                Letter Reference:
+                ${safeReference}
+              </div>
+            `
+            : ""
+        }
+      </div>
+    `
+    : `
+      <div
+        style="
+          margin:28px 0;
+          padding:18px;
+          background:#fff7ed;
+          border:1px solid #fed7aa;
+          border-radius:12px;
+          color:#9a3412;
+        "
+      >
+        Your admission has been approved. Your official
+        admission letter will be made available through
+        the student portal.
+      </div>
+    `;
+
+  const html = emailLayout({
+    title:
+      "Admission Approved",
+    preheader:
+      "Congratulations! Your ITMT admission application has been approved.",
+    content: `
+      <p style="margin:0 0 18px;">
+        Dear <strong>${safeName}</strong>,
+      </p>
+
+      <p
+        style="
+          margin:0 0 20px;
+          font-size:17px;
+          color:#166534;
+          font-weight:700;
+        "
+      >
+        Congratulations on your admission to ITMT Academy!
+      </p>
+
+      <p style="margin:0 0 22px;">
+        We are pleased to inform you that your admission
+        application has been approved.
+      </p>
+
+      <div
+        style="
+          margin:26px 0;
+          padding:20px;
+          background:#f0fdf4;
+          border:1px solid #bbf7d0;
+          border-radius:12px;
+        "
+      >
+        <div
+          style="
+            font-size:12px;
+            font-weight:700;
+            color:#64748b;
+            text-transform:uppercase;
+            letter-spacing:1px;
+            margin-bottom:7px;
+          "
+        >
+          Application Number
+        </div>
+
+        <div
+          style="
+            font-size:20px;
+            font-weight:800;
+            color:#166534;
+            margin-bottom:18px;
+          "
+        >
+          ${safeApplicationNumber}
+        </div>
+
+        <div
+          style="
+            font-size:12px;
+            font-weight:700;
+            color:#64748b;
+            text-transform:uppercase;
+            letter-spacing:1px;
+            margin-bottom:7px;
+          "
+        >
+          Matriculation Number
+        </div>
+
+        <div
+          style="
+            font-size:24px;
+            font-weight:800;
+            color:#0f172a;
+          "
+        >
+          ${safeMatricNumber}
+        </div>
+      </div>
+
+      <p style="margin:0 0 16px;">
+        <strong>Admission Status:</strong>
+
+        <span
+          style="
+            display:inline-block;
+            margin-left:6px;
+            padding:4px 10px;
+            background:#dcfce7;
+            color:#166534;
+            border-radius:999px;
+            font-size:12px;
+            font-weight:700;
+          "
+        >
+          APPROVED
+        </span>
+      </p>
+
+      ${letterSection}
+
+      <p style="margin:22px 0 0;">
+        Your student account activation instructions are also
+        being sent separately. Please keep your matriculation
+        number safe as it will be used to identify your student
+        account.
+      </p>
+    `,
+  });
+
+  await sendEmail({
+    to,
+    subject:
+      "Congratulations! Your ITMT admission has been approved",
+    html,
+    ...(admissionLetterPdf
+      ? {
+          attachments: [
+            {
+              filename:
+                `ITMT-Admission-Letter-${matricNumber.replace(
+                  /[^a-zA-Z0-9-_]/g,
+                  "-",
+                )}.pdf`,
+              content:
+                admissionLetterPdf,
+            },
+          ],
+        }
+      : {}),
+  });
+}
+
+/* =========================================================
+   ADMISSION REJECTED
+========================================================= */
+
+export async function sendAdmissionRejectedEmail(
+  to: string,
+  name: string,
+  applicationNumber: string,
+  rejectionReason: string,
+): Promise<void> {
+  const safeName = escapeHtml(name);
+
+  const safeApplicationNumber =
+    escapeHtml(applicationNumber);
+
+  const safeRejectionReason =
+    escapeHtml(rejectionReason);
+
+  const html = emailLayout({
+    title:
+      "Admission Application Update",
+    preheader:
+      "There has been an update to your ITMT admission application.",
+    content: `
+      <p style="margin:0 0 18px;">
+        Dear <strong>${safeName}</strong>,
+      </p>
+
+      <p style="margin:0 0 20px;">
+        Thank you for your interest in ITMT Academy.
+        After reviewing your admission application, we regret
+        to inform you that your application was not approved
+        at this time.
+      </p>
+
+      <div
+        style="
+          margin:26px 0;
+          padding:20px;
+          background:#fef2f2;
+          border:1px solid #fecaca;
+          border-radius:12px;
+        "
+      >
+        <div
+          style="
+            font-size:12px;
+            font-weight:700;
+            color:#64748b;
+            text-transform:uppercase;
+            letter-spacing:1px;
+            margin-bottom:7px;
+          "
+        >
+          Application Number
+        </div>
+
+        <div
+          style="
+            font-size:20px;
+            font-weight:800;
+            color:#991b1b;
+            margin-bottom:18px;
+          "
+        >
+          ${safeApplicationNumber}
+        </div>
+
+        <div
+          style="
+            font-size:12px;
+            font-weight:700;
+            color:#64748b;
+            text-transform:uppercase;
+            letter-spacing:1px;
+            margin-bottom:7px;
+          "
+        >
+          Status
+        </div>
+
+        <div
+          style="
+            font-size:18px;
+            font-weight:800;
+            color:#991b1b;
+          "
+        >
+          REJECTED
+        </div>
+      </div>
+
+      <div
+        style="
+          margin:24px 0;
+          padding:18px 20px;
+          background:#f8fafc;
+          border-left:4px solid #94a3b8;
+          border-radius:8px;
+        "
+      >
+        <div
+          style="
+            font-size:12px;
+            font-weight:700;
+            color:#64748b;
+            text-transform:uppercase;
+            letter-spacing:1px;
+            margin-bottom:8px;
+          "
+        >
+          Reason
+        </div>
+
+        <div
+          style="
+            font-size:15px;
+            line-height:1.7;
+            color:#374151;
+          "
+        >
+          ${safeRejectionReason}
+        </div>
+      </div>
+
+      <p style="margin:0;">
+        If you have questions regarding this decision,
+        please contact the ITMT Academy admissions office.
+      </p>
+    `,
+  });
+
+  await sendEmail({
+    to,
+    subject:
+      `ITMT admission application update — ${applicationNumber}`,
+    html,
+  });
+}
+
+/* =========================================================
+   CONTACT NOTIFICATION
+========================================================= */
 
 export async function sendContactNotificationEmail(
   name: string,
   email: string,
   subject: string,
   message: string,
-) {
-  const notifyTo = process.env.EMAIL_FROM_EMAIL || process.env.EMAIL_USER;
+): Promise<void> {
+  const safeName = escapeHtml(name);
+  const safeEmail = escapeHtml(email);
+  const safeSubject = escapeHtml(subject);
+  const safeMessage = escapeHtml(message);
 
-  if (!notifyTo) {
-    throw new Error(
-      "EMAIL_FROM_EMAIL or EMAIL_USER must be configured for contact notifications.",
-    );
-  }
+  const html = emailLayout({
+    title:
+      "New Contact Message",
+    preheader:
+      `New contact message from ${name}.`,
+    content: `
+      <p style="margin:0 0 16px;">
+        <strong>Name:</strong>
+        ${safeName}
+      </p>
 
-  return sendEmail({
-    to: notifyTo,
-    replyTo: email,
-    subject: `New contact form message: ${subject}`,
-    html: `
-      <div style="
-        font-family: Arial, sans-serif;
-        max-width: 700px;
-        margin: 0 auto;
-        padding: 32px;
-        color: #1f2937;
-      ">
-        <h2 style="color: #0f172a;">
-          New Contact Form Message
-        </h2>
+      <p style="margin:0 0 16px;">
+        <strong>Email:</strong>
+        ${safeEmail}
+      </p>
 
-        <p>
-          <strong>Name:</strong> ${name}
-        </p>
+      <p style="margin:0 0 16px;">
+        <strong>Subject:</strong>
+        ${safeSubject}
+      </p>
 
-        <p>
-          <strong>Email:</strong> ${email}
-        </p>
-
-        <p>
-          <strong>Subject:</strong> ${subject}
-        </p>
-
-        <div style="
-          margin-top: 24px;
-          padding: 20px;
-          background: #f8fafc;
-          border: 1px solid #e5e7eb;
-          border-radius: 10px;
-        ">
-          <p style="white-space: pre-wrap;">
-            ${message}
-          </p>
-        </div>
+      <div
+        style="
+          margin-top:22px;
+          padding:20px;
+          background:#f8fafc;
+          border:1px solid #e2e8f0;
+          border-radius:10px;
+          white-space:pre-wrap;
+        "
+      >
+        ${safeMessage}
       </div>
     `,
+  });
+
+  await sendEmail({
+    to:
+      process.env.CONTACT_NOTIFICATION_EMAIL ||
+      getFromAddress(),
+    subject:
+      `New contact message: ${subject}`,
+    html,
+    replyTo: email,
   });
 }
 

@@ -5,86 +5,138 @@ import Department from "../models/Department.js";
 import { createAuditLog } from "../services/auditLog.service.js";
 import type { AuthRequest } from "../middleware/auth.middleware.js";
 
+/**
+ * =========================================================
+ * VALIDATION
+ * =========================================================
+ */
+
 const departmentSchema = z.object({
   name: z.string().trim().min(2),
+
   code: z.string().trim().min(2).max(10),
-  description: z.string().trim().max(500).optional(),
-  headOfDepartment: z.string().optional(),
+
+  description: z
+    .string()
+    .trim()
+    .max(500)
+    .optional(),
+
+  headOfDepartment: z
+    .string()
+    .optional(),
 });
 
 /**
  * =========================================================
  * CREATE DEPARTMENT
  * =========================================================
+ *
+ * POST /api/departments
  */
-
 export async function createDepartment(
   req: AuthRequest,
   res: Response,
 ) {
   try {
-    const data = departmentSchema.parse(req.body);
+    const parsed = departmentSchema.safeParse(req.body);
 
-    const department = await Department.create({
-      ...data,
-      code: data.code.toUpperCase(),
-    });
-
-    /**
-     * Audit successful department creation.
-     *
-     * IMPORTANT:
-     * Audit logging must never break the actual operation.
-     */
-    await createAuditLog({
-      req,
-      actorId: req.user?.userId,
-      actorRole: req.user?.role,
-      action: "CREATE",
-      module: "DEPARTMENTS",
-      description:
-        `Department ${department.name} (${department.code}) was created.`,
-      targetType: "Department",
-      targetId: department._id.toString(),
-      metadata: {
-        name: department.name,
-        code: department.code,
-        headOfDepartment:
-          department.headOfDepartment?.toString(),
-      },
-      status: "success",
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Department created successfully",
-      department,
-    });
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
+    if (!parsed.success) {
       return res.status(400).json({
         success: false,
-        message: "Validation failed",
-        errors: error.flatten().fieldErrors,
+        message: "Invalid department data.",
+        errors: parsed.error.flatten(),
       });
     }
 
-    if (error?.code === 11000) {
+    const {
+      name,
+      code,
+      description,
+      headOfDepartment,
+    } = parsed.data;
+
+    const normalizedCode = code.toUpperCase();
+
+    /**
+     * Prevent duplicate department codes.
+     */
+    const existingDepartment =
+      await Department.findOne({
+        code: normalizedCode,
+      });
+
+    if (existingDepartment) {
       return res.status(409).json({
         success: false,
         message:
-          "A department with this name or code already exists",
+          "A department with this code already exists.",
       });
     }
 
+    const department =
+      await Department.create({
+        name,
+        code: normalizedCode,
+        description,
+        headOfDepartment:
+          headOfDepartment || undefined,
+        isActive: true,
+      });
+
+    /**
+     * =====================================================
+     * AUDIT LOG
+     * =====================================================
+     *
+     * IMPORTANT:
+     * AuthRequest.user contains:
+     *
+     * {
+     *   userId: string;
+     *   role: UserRole;
+     * }
+     *
+     * Therefore we use:
+     *
+     * actorId: req.user?.userId
+     */
+    try {
+      await createAuditLog({
+        actorId: req.user?.userId,
+        action: "CREATE",
+        module: "DEPARTMENTS",
+        targetType: "Department",
+        targetId: department._id,
+        description:
+          `Created department ${department.name} (${department.code})`,
+        metadata: {
+          name: department.name,
+          code: department.code,
+        },
+        status: "success",
+      });
+    } catch (auditError) {
+      console.error(
+        "CREATE DEPARTMENT AUDIT ERROR:",
+        auditError,
+      );
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Department created successfully.",
+      department,
+    });
+  } catch (error) {
     console.error(
-      "Create department error:",
+      "CREATE DEPARTMENT ERROR:",
       error,
     );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to create department",
+      message: "Failed to create department.",
     });
   }
 }
@@ -94,28 +146,27 @@ export async function createDepartment(
  * GET DEPARTMENTS
  * =========================================================
  *
- * This is a read-only operation.
+ * GET /api/departments
  *
- * We intentionally DO NOT create audit logs for normal
- * GET requests because that would create unnecessary noise
- * in the audit history.
+ * Protected route.
  */
-
 export async function getDepartments(
   _req: Request,
   res: Response,
 ) {
   try {
-    const departments = await Department.find({
-      isActive: true,
-    })
-      .populate(
-        "headOfDepartment",
-        "name email",
-      )
-      .sort({
-        name: 1,
-      });
+    const departments =
+      await Department.find({
+        isActive: true,
+      })
+        .populate(
+          "headOfDepartment",
+          "name email",
+        )
+        .sort({
+          name: 1,
+        })
+        .lean();
 
     return res.status(200).json({
       success: true,
@@ -123,13 +174,57 @@ export async function getDepartments(
     });
   } catch (error) {
     console.error(
-      "Get departments error:",
+      "GET DEPARTMENTS ERROR:",
       error,
     );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to retrieve departments",
+      message: "Failed to fetch departments.",
+    });
+  }
+}
+
+/**
+ * =========================================================
+ * GET PUBLIC DEPARTMENTS
+ * =========================================================
+ *
+ * GET /api/departments/public
+ *
+ * Public route used by:
+ * - Admission application form
+ * - Public admission pages
+ * - Other public forms
+ */
+export async function getPublicDepartments(
+  _req: Request,
+  res: Response,
+) {
+  try {
+    const departments =
+      await Department.find({
+        isActive: true,
+      })
+        .select("name code")
+        .sort({
+          name: 1,
+        })
+        .lean();
+
+    return res.status(200).json({
+      success: true,
+      departments,
+    });
+  } catch (error) {
+    console.error(
+      "GET PUBLIC DEPARTMENTS ERROR:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch public departments.",
     });
   }
 }
@@ -138,30 +233,43 @@ export async function getDepartments(
  * =========================================================
  * UPDATE DEPARTMENT
  * =========================================================
+ *
+ * PATCH /api/departments/:id
  */
-
 export async function updateDepartment(
   req: AuthRequest,
   res: Response,
 ) {
   try {
-    const data =
-      departmentSchema.partial().parse(
-        req.body,
-      );
+    const { id } = req.params;
+
+    const parsed =
+      departmentSchema
+        .partial()
+        .safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid department data.",
+        errors: parsed.error.flatten(),
+      });
+    }
+
+    const updateData = {
+      ...parsed.data,
+
+      ...(parsed.data.code
+        ? {
+            code: parsed.data.code.toUpperCase(),
+          }
+        : {}),
+    };
 
     const department =
       await Department.findByIdAndUpdate(
-        req.params.id,
-        {
-          ...data,
-          ...(data.code
-            ? {
-                code:
-                  data.code.toUpperCase(),
-              }
-            : {}),
-        },
+        id,
+        updateData,
         {
           new: true,
           runValidators: true,
@@ -171,69 +279,49 @@ export async function updateDepartment(
     if (!department) {
       return res.status(404).json({
         success: false,
-        message: "Department not found",
+        message: "Department not found.",
       });
     }
 
     /**
-     * Audit successful department update.
+     * Audit update.
      */
-    await createAuditLog({
-      req,
-      actorId: req.user?.userId,
-      actorRole: req.user?.role,
-      action: "UPDATE",
-      module: "DEPARTMENTS",
-      description:
-        `Department ${department.name} (${department.code}) was updated.`,
-      targetType: "Department",
-      targetId:
-        department._id.toString(),
-      metadata: {
-        departmentId:
-          department._id.toString(),
-
-        name: department.name,
-
-        code: department.code,
-
-        changes: data,
-      },
-      status: "success",
-    });
+    try {
+      await createAuditLog({
+        actorId: req.user?.userId,
+        action: "UPDATE",
+        module: "DEPARTMENTS",
+        targetType: "Department",
+        targetId: department._id,
+        description:
+          `Updated department ${department.name} (${department.code})`,
+        metadata: {
+          updatedFields:
+            Object.keys(updateData),
+        },
+        status: "success",
+      });
+    } catch (auditError) {
+      console.error(
+        "UPDATE DEPARTMENT AUDIT ERROR:",
+        auditError,
+      );
+    }
 
     return res.status(200).json({
       success: true,
-      message:
-        "Department updated successfully",
+      message: "Department updated successfully.",
       department,
     });
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: error.flatten().fieldErrors,
-      });
-    }
-
-    if (error?.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        message:
-          "A department with this name or code already exists",
-      });
-    }
-
+  } catch (error) {
     console.error(
-      "Update department error:",
+      "UPDATE DEPARTMENT ERROR:",
       error,
     );
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to update department",
+      message: "Failed to update department.",
     });
   }
 }
@@ -242,16 +330,19 @@ export async function updateDepartment(
  * =========================================================
  * ARCHIVE DEPARTMENT
  * =========================================================
+ *
+ * PATCH /api/departments/:id/archive
  */
-
 export async function archiveDepartment(
   req: AuthRequest,
   res: Response,
 ) {
   try {
+    const { id } = req.params;
+
     const department =
       await Department.findByIdAndUpdate(
-        req.params.id,
+        id,
         {
           isActive: false,
         },
@@ -263,53 +354,49 @@ export async function archiveDepartment(
     if (!department) {
       return res.status(404).json({
         success: false,
-        message: "Department not found",
+        message: "Department not found.",
       });
     }
 
     /**
-     * Audit department archive.
+     * Audit archive/deactivation.
      */
-    await createAuditLog({
-      req,
-      actorId: req.user?.userId,
-      actorRole: req.user?.role,
-      action: "DEACTIVATE",
-      module: "DEPARTMENTS",
-      description:
-        `Department ${department.name} (${department.code}) was archived.`,
-      targetType: "Department",
-      targetId:
-        department._id.toString(),
-      metadata: {
-        departmentId:
-          department._id.toString(),
-
-        name: department.name,
-
-        code: department.code,
-
-        isActive:
-          department.isActive,
-      },
-      status: "success",
-    });
+    try {
+      await createAuditLog({
+        actorId: req.user?.userId,
+        action: "DEACTIVATE",
+        module: "DEPARTMENTS",
+        targetType: "Department",
+        targetId: department._id,
+        description:
+          `Archived department ${department.name} (${department.code})`,
+        metadata: {
+          name: department.name,
+          code: department.code,
+        },
+        status: "success",
+      });
+    } catch (auditError) {
+      console.error(
+        "ARCHIVE DEPARTMENT AUDIT ERROR:",
+        auditError,
+      );
+    }
 
     return res.status(200).json({
       success: true,
-      message:
-        "Department archived successfully",
+      message: "Department archived successfully.",
+      department,
     });
   } catch (error) {
     console.error(
-      "Archive department error:",
+      "ARCHIVE DEPARTMENT ERROR:",
       error,
     );
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to archive department",
+      message: "Failed to archive department.",
     });
   }
 }
