@@ -25,22 +25,27 @@ export type UserRole =
 declare module "next-auth" {
   interface User {
     id: string;
+
     role: UserRole;
+
     accessToken: string;
+
     matricNumber?: string;
   }
 
   interface Session {
     user: {
       id: string;
+
       role: UserRole;
+
       matricNumber?: string;
     } & DefaultSession["user"];
 
     /**
      * Backend Express JWT.
      *
-     * The backend token is exposed here:
+     * This is available as:
      *
      * session.accessToken
      *
@@ -61,8 +66,12 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
+
     role?: UserRole;
+
     accessToken?: string;
+
     matricNumber?: string;
   }
 }
+

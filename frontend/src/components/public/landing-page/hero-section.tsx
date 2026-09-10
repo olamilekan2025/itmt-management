@@ -74,13 +74,41 @@ export default function HeroSection() {
     );
   }
 
-  if (slides.length === 0) {
-    return (
-      <section className="flex h-[640px] items-center justify-center bg-brand-navy md:h-[600px]">
-        <p className="text-white/60">Welcome to ITMT.</p>
-      </section>
-    );
-  }
+if (slides.length === 0) {
+  return (
+    <section className="relative h-[640px] overflow-hidden bg-brand-navy md:h-[600px]">
+      {/* Background image */}
+      <Image
+        src="/login.png"
+        alt="Institute of Transport and Management Technology"
+        fill
+        priority
+        className="object-cover"
+      />
+
+      {/* Dark overlay */}
+      <div className="absolute inset-0 bg-brand-navy/65" />
+
+      {/* Text */}
+      <div className="relative z-10 flex h-full items-center justify-center px-6 text-center">
+        <div className="max-w-4xl">
+          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.3em] text-brand-gold">
+            ITMT Academy
+          </p>
+
+          <h1 className="text-3xl font-bold uppercase leading-tight tracking-wide text-white sm:text-4xl md:text-5xl lg:text-6xl">
+            Institute of Transport and Management Technology
+          </h1>
+
+          <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-white/80 md:text-lg">
+            Excellence in transport, management, technology, and professional
+            education.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
 
   const active = slides[activeIndex];
 
