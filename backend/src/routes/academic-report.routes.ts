@@ -18,7 +18,7 @@ const router = Router();
 router.get(
   "/",
   authenticate,
-  authorize("admin"),
+  authorize("admin", "registrar"),
   getAcademicReport,
 );
 

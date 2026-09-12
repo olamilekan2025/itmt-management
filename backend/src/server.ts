@@ -138,6 +138,7 @@ import heroSlideRoutes from "./routes/heroSlide.routes.js";
 import feeCategoryRoutes from "./routes/feeCategory.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import subscriptionRoutes from "./routes/subscription.routes.js";
+import graduationRoutes from "./routes/graduation.routes.js";
 
 const app = express();
 
@@ -264,6 +265,7 @@ app.use("/api/fee-categories", feeCategoryRoutes);
 
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/graduations", graduationRoutes);
 
 /**
  * =========================================================

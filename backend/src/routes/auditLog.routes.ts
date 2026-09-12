@@ -1,3 +1,4 @@
+
 import { Router } from "express";
 
 import {
@@ -25,12 +26,13 @@ const router = Router();
  *
  * Audit logs contain sensitive administrative information.
  *
- * Only authenticated administrators can access them.
+ * Only authenticated administrators and registrars can
+ * access the audit-log viewer.
  */
 
 router.use(
   authenticate,
-  authorize("admin"),
+  authorize("admin", "registrar"),
 );
 
 /**
@@ -58,3 +60,4 @@ router.get(
 );
 
 export default router;
+
