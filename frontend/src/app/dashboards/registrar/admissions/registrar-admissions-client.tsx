@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import Link from "next/link";
 
 import { apiGet, apiPatch } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -48,21 +47,45 @@ import {
   Phone,
   MapPin,
   BookOpen,
-  ChevronRight,
   ArrowUpRight,
   Loader2,
+  Paperclip,
+  ExternalLink,
+  type LucideIcon,
 } from "lucide-react";
+
+/* =========================================================
+   TYPES — matches server Admission model
+========================================================= */
+
+interface AdmissionDocument {
+  type: string;
+  filename: string;
+  url: string;
+}
+
+interface Referee {
+  name: string;
+  address?: string;
+  phone?: string;
+  relationship?: string;
+}
+
+interface EducationRecord {
+  schoolAttended: string;
+  certificate: string;
+  dateObtained?: string;
+  grade?: string;
+}
 
 interface Admission {
   _id: string;
   applicationNumber: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
+  surname: string;
+  otherNames: string;
   email: string;
-  phone?: string;
+  telephone?: string;
   dateOfBirth?: string;
-  gender?: string;
   nationality?: string;
   postalAddress?: string;
   residentialAddress?: string;
@@ -76,9 +99,9 @@ interface Admission {
   student?: { _id: string; name: string };
   matricNumber?: string;
   rejectionReason?: string;
-  referees?: Array<{ name: string; address: string; phone: string; isGuardianOrSponsor: boolean }>;
-  educationHistory?: Array<{ schoolAttended: string; certificateObtained: string; dateObtained?: string; grade?: string }>;
-  passportPhotoUrl?: string;
+  referees?: Referee[];
+  educationRecords?: EducationRecord[];
+  documents?: AdmissionDocument[];
   medicalCondition?: string;
   referredBy?: string;
   createdAt: string;
@@ -100,38 +123,133 @@ interface AdmissionsResponse {
   };
 }
 
+/* =========================================================
+   DOCUMENT TYPE LABELS
+========================================================= */
+
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  passportPhoto: "Passport photograph",
+  primarySchoolCertificate: "Primary school certificate",
+  secondarySchoolCertificate: "Secondary school certificate",
+  birthCertificate: "Birth certificate",
+  waecNecoResult: "WAEC/NECO result",
+  testimonial: "Testimonial",
+  stateOfOriginCertificate: "State of origin certificate",
+};
+
+function getDocumentLabel(type: string) {
+  return DOCUMENT_TYPE_LABELS[type] || type;
+}
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function getPassportPhoto(admission: Admission): string | undefined {
+  return admission.documents?.find((doc) => doc.type === "passportPhoto")?.url;
+}
+
+function getInitials(otherNames?: string, surname?: string) {
+  return `${otherNames?.charAt(0) || ""}${surname?.charAt(0) || ""}`.toUpperCase();
+}
+
+function getFullName(admission: { otherNames?: string; surname?: string } | null | undefined) {
+  if (!admission) return "";
+  return `${admission.otherNames ?? ""} ${admission.surname ?? ""}`.trim();
+}
+
+function isGuardianOrSponsor(referee: Referee) {
+  return /guardian|sponsor/i.test(referee.relationship || "");
+}
+
+/* =========================================================
+   SAFE IMAGE — falls back gracefully instead of a broken
+   image glyph when a Cloudinary URL 404s / 401s
+========================================================= */
+
+function SafeImage({
+  src,
+  alt,
+  className,
+  fallback,
+}: {
+  src?: string;
+  alt: string;
+  className?: string;
+  fallback: React.ReactNode;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return <>{fallback}</>;
+  }
+
+  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />;
+}
+
+/* =========================================================
+   MODAL BUILDING BLOCKS
+========================================================= */
+
+function SectionHeading({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
+  return (
+    <div className="mb-4 flex items-center gap-2.5">
+      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-navy/[0.06] text-brand-navy">
+        <Icon className="h-3.5 w-3.5" />
+      </div>
+      <h3 className="text-[15px] font-semibold text-slate-900">{title}</h3>
+    </div>
+  );
+}
+
+function InfoField({
+  label,
+  value,
+  icon: Icon,
+  span,
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon?: LucideIcon;
+  span?: boolean;
+}) {
+  if (!value) return null;
+
+  return (
+    <div className={span ? "sm:col-span-2" : undefined}>
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="mt-1 flex items-start gap-1.5 text-sm font-medium text-slate-900">
+        {Icon && <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />}
+        <span>{value}</span>
+      </p>
+    </div>
+  );
+}
+
 const statCards = [
   {
     key: "total",
     label: "Total Applications",
     description: "All submitted applications",
     icon: Users,
-    color: "bg-brand-navy",
-    textColor: "text-brand-gold",
   },
   {
     key: "pending",
     label: "Pending Review",
     description: "Awaiting registrar review",
     icon: Clock3,
-    color: "bg-amber-500",
-    textColor: "text-white",
   },
   {
     key: "approved",
     label: "Approved",
     description: "Successfully admitted",
     icon: CheckCircle2,
-    color: "bg-emerald-500",
-    textColor: "text-white",
   },
   {
     key: "rejected",
     label: "Rejected",
     description: "Not admitted",
     icon: XCircle,
-    color: "bg-red-500",
-    textColor: "text-white",
   },
 ];
 
@@ -210,10 +328,6 @@ function getStatusBadge(status: string) {
   );
 }
 
-function getInitials(firstName: string, lastName: string) {
-  return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
-}
-
 export default function RegistrarAdmissionsClient({
   initialAdmissions,
   initialTotal,
@@ -282,9 +396,8 @@ export default function RegistrarAdmissionsClient({
         (a) =>
           a.applicationNumber.toLowerCase().includes(query) ||
           a.email.toLowerCase().includes(query) ||
-          a.firstName.toLowerCase().includes(query) ||
-          a.lastName.toLowerCase().includes(query) ||
-          (a.middleName && a.middleName.toLowerCase().includes(query))
+          (a.otherNames && a.otherNames.toLowerCase().includes(query)) ||
+          (a.surname && a.surname.toLowerCase().includes(query)),
       );
     }
 
@@ -314,8 +427,8 @@ export default function RegistrarAdmissionsClient({
                 reviewedAt: new Date().toISOString(),
                 matricNumber: response.data.matricNumber,
               }
-            : a
-        )
+            : a,
+        ),
       );
 
       setSuccess(`Application approved. Matric number: ${response.data.matricNumber}`);
@@ -346,8 +459,8 @@ export default function RegistrarAdmissionsClient({
         prev.map((a) =>
           a._id === selectedAdmission._id
             ? { ...a, status: "REJECTED", reviewedAt: new Date().toISOString(), rejectionReason }
-            : a
-        )
+            : a,
+        ),
       );
 
       setSuccess("Application rejected successfully");
@@ -398,145 +511,121 @@ export default function RegistrarAdmissionsClient({
         {/* ============================================================
             PAGE HEADER
         ============================================================ */}
-<motion.section
-  initial={{ opacity: 0, y: 10 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{
-    duration: 0.45,
-    ease: [0.22, 1, 0.36, 1],
-  }}
-  className="
-    relative overflow-hidden
-    rounded-2xl
-    bg-brand-navy
-    px-5 py-5
-    shadow-lg shadow-brand-navy/10
-    sm:px-6 sm:py-6
-  "
->
-  {/* Subtle background details */}
-  <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-brand-blue/15 blur-3xl" />
-  <div className="pointer-events-none absolute -bottom-28 right-1/3 h-48 w-48 rounded-full bg-brand-gold/10 blur-3xl" />
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.45,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          className="
+            relative overflow-hidden
+            rounded-2xl
+            bg-brand-navy
+            px-5 py-5
+            shadow-lg shadow-brand-navy/10
+            sm:px-6 sm:py-6
+          "
+        >
+          <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-brand-blue/15 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 right-1/3 h-48 w-48 rounded-full bg-brand-gold/10 blur-3xl" />
 
-  {/* Subtle grid texture */}
-  <div
-    className="
-      pointer-events-none absolute inset-0 opacity-[0.035]
-      [background-image:linear-gradient(rgba(255,255,255,1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,1)_1px,transparent_1px)]
-      [background-size:32px_32px]
-    "
-  />
+          <div
+            className="
+              pointer-events-none absolute inset-0 opacity-[0.035]
+              [background-image:linear-gradient(rgba(255,255,255,1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,1)_1px,transparent_1px)]
+              [background-size:32px_32px]
+            "
+          />
 
-  <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-    {/* Left */}
-    <div className="flex min-w-0 items-center gap-4">
-      {/* Section icon */}
-      <div
-        className="
-          flex h-12 w-12 shrink-0 items-center justify-center
-          rounded-xl
-          border border-white/10
-          bg-white/10
-          text-brand-gold
-          shadow-inner
-          backdrop-blur-sm
-          sm:h-14 sm:w-14
-        "
-      >
-        <GraduationCap className="h-6 w-6 sm:h-7 sm:w-7" />
-      </div>
+          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <div
+                className="
+                  flex h-12 w-12 shrink-0 items-center justify-center
+                  rounded-xl
+                  border border-white/10
+                  bg-white/10
+                  text-brand-gold
+                  shadow-inner
+                  backdrop-blur-sm
+                  sm:h-14 sm:w-14
+                "
+              >
+                <GraduationCap className="h-6 w-6 sm:h-7 sm:w-7" />
+              </div>
 
-      <div className="min-w-0">
-        {/* Eyebrow */}
-        <div className="flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-gold" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-brand-gold" />
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-gold sm:text-[11px]">
+                    Admissions Management
+                  </p>
+                </div>
 
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-gold sm:text-[11px]">
-            Admissions Management
-          </p>
-        </div>
+                <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">Admissions</h1>
 
-        {/* Title */}
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          Admissions
-        </h1>
+                <p className="mt-1.5 max-w-2xl text-xs leading-5 text-slate-300 sm:text-sm">
+                  Review applications, verify applicant information and manage admission decisions.
+                </p>
+              </div>
+            </div>
 
-        {/* Description */}
-        <p className="mt-1.5 max-w-2xl text-xs leading-5 text-slate-300 sm:text-sm">
-          Review applications, verify applicant information and manage
-          admission decisions.
-        </p>
-      </div>
-    </div>
+            <div className="flex shrink-0 items-center gap-3">
+              <div
+                className="
+                  hidden items-center gap-2
+                  rounded-lg
+                  border border-white/10
+                  bg-white/5
+                  px-3 py-2
+                  text-[11px] font-medium text-slate-300
+                  backdrop-blur-sm
+                  md:flex
+                "
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                </span>
+                Live data
+              </div>
 
-    {/* Right */}
-    <div className="flex shrink-0 items-center gap-3">
-      {/* Live indicator */}
-      <div
-        className="
-          hidden items-center gap-2
-          rounded-lg
-          border border-white/10
-          bg-white/5
-          px-3 py-2
-          text-[11px] font-medium text-slate-300
-          backdrop-blur-sm
-          md:flex
-        "
-      >
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-        </span>
-
-        Live data
-      </div>
-
-      {/* Refresh */}
-      <button
-        type="button"
-        onClick={() => loadAdmissions(true)}
-        disabled={refreshing}
-        className="
-          group
-          inline-flex items-center justify-center gap-2
-          rounded-xl
-          border border-white/15
-          bg-white
-          px-4 py-2.5
-          text-sm font-bold
-          text-brand-navy
-          shadow-md shadow-black/10
-          transition-all duration-200
-          hover:-translate-y-0.5
-          hover:bg-slate-100
-          hover:shadow-lg
-          disabled:cursor-not-allowed
-          disabled:opacity-60
-          disabled:hover:translate-y-0
-        "
-      >
-        <RefreshCw
-          className={`
-            h-4 w-4
-            transition-transform duration-300
-            ${
-              refreshing
-                ? "animate-spin"
-                : "group-hover:rotate-45"
-            }
-          `}
-        />
-
-        <span>
-          {refreshing ? "Refreshing..." : "Refresh"}
-        </span>
-      </button>
-    </div>
-  </div>
-</motion.section>
-
-
+              <button
+                type="button"
+                onClick={() => loadAdmissions(true)}
+                disabled={refreshing}
+                className="
+                  group
+                  inline-flex items-center justify-center gap-2
+                  rounded-xl
+                  border border-white/15
+                  bg-white
+                  px-4 py-2.5
+                  text-sm font-bold
+                  text-brand-navy
+                  shadow-md shadow-black/10
+                  transition-all duration-200
+                  hover:-translate-y-0.5
+                  hover:bg-slate-100
+                  hover:shadow-lg
+                  disabled:cursor-not-allowed
+                  disabled:opacity-60
+                  disabled:hover:translate-y-0
+                "
+              >
+                <RefreshCw
+                  className={`
+                    h-4 w-4
+                    transition-transform duration-300
+                    ${refreshing ? "animate-spin" : "group-hover:rotate-45"}
+                  `}
+                />
+                <span>{refreshing ? "Refreshing..." : "Refresh"}</span>
+              </button>
+            </div>
+          </div>
+        </motion.section>
 
         {/* ============================================================
             ERROR / SUCCESS BANNERS
@@ -699,91 +788,89 @@ export default function RegistrarAdmissionsClient({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredAdmissions.map((admission, index) => (
-                        <motion.tr
-                          key={admission._id}
-                          initial={{ opacity: 0, x: -8 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.3, delay: index * 0.03 }}
-                          className="group transition-colors hover:bg-slate-50/70"
-                        >
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              {admission.passportPhotoUrl ? (
-                                <img
-                                  src={admission.passportPhotoUrl}
+                      {filteredAdmissions.map((admission, index) => {
+                        const passportPhoto = getPassportPhoto(admission);
+
+                        return (
+                          <motion.tr
+                            key={admission._id}
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.3, delay: index * 0.03 }}
+                            className="group transition-colors hover:bg-slate-50/70"
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <SafeImage
+                                  src={passportPhoto}
                                   alt=""
                                   className="h-10 w-10 rounded-full object-cover ring-2 ring-slate-100"
+                                  fallback={
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-navy text-xs font-bold text-brand-gold ring-2 ring-slate-100">
+                                      {getInitials(admission.otherNames, admission.surname)}
+                                    </div>
+                                  }
                                 />
-                              ) : (
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-navy text-xs font-bold text-brand-gold ring-2 ring-slate-100">
-                                  {getInitials(admission.firstName, admission.lastName)}
+                                <div>
+                                  <p className="font-semibold text-slate-900">{getFullName(admission)}</p>
+                                  <p className="text-xs text-slate-500">{admission.email}</p>
                                 </div>
-                              )}
-                              <div>
-                                <p className="font-semibold text-slate-900">
-                                  {admission.firstName} {admission.middleName && `${admission.middleName} `}{" "}
-                                  {admission.lastName}
-                                </p>
-                                <p className="text-xs text-slate-500">{admission.email}</p>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="font-mono text-xs font-semibold text-brand-navy">
-                              {admission.applicationNumber}
-                            </p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-sm font-medium text-slate-900">
-                              {admission.programme?.name || "—"}
-                            </p>
-                            {admission.programme?.code && (
-                              <p className="text-xs text-slate-500">{admission.programme.code}</p>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-sm text-slate-900">{admission.academicSession?.name || "—"}</p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-xs text-slate-500">{formatDateShort(admission.submittedAt)}</p>
-                          </td>
-                          <td className="px-6 py-4">{getStatusBadge(admission.status)}</td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openDetails(admission)}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-brand-navy"
-                                title="View details"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </button>
-
-                              {(admission.status === "PENDING" || admission.status === "UNDER_REVIEW") && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => openApproveDialog(admission)}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600"
-                                    title="Approve"
-                                  >
-                                    <CheckCircle2 className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openRejectDialog(admission)}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                                    title="Reject"
-                                  >
-                                    <XCircle className="h-4 w-4" />
-                                  </button>
-                                </>
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="font-mono text-xs font-semibold text-brand-navy">
+                                {admission.applicationNumber}
+                              </p>
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="text-sm font-medium text-slate-900">{admission.programme?.name || "—"}</p>
+                              {admission.programme?.code && (
+                                <p className="text-xs text-slate-500">{admission.programme.code}</p>
                               )}
-                            </div>
-                          </td>
-                        </motion.tr>
-                      ))}
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="text-sm text-slate-900">{admission.academicSession?.name || "—"}</p>
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="text-xs text-slate-500">{formatDateShort(admission.submittedAt)}</p>
+                            </td>
+                            <td className="px-6 py-4">{getStatusBadge(admission.status)}</td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openDetails(admission)}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-brand-navy"
+                                  title="View details"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </button>
+
+                                {(admission.status === "PENDING" || admission.status === "UNDER_REVIEW") && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => openApproveDialog(admission)}
+                                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600"
+                                      title="Approve"
+                                    >
+                                      <CheckCircle2 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => openRejectDialog(admission)}
+                                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                      title="Reject"
+                                    >
+                                      <XCircle className="h-4 w-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </motion.tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -794,299 +881,259 @@ export default function RegistrarAdmissionsClient({
       </div>
 
       {/* ============================================================
-          APPLICANT DETAILS DIALOG
+          APPLICANT DETAILS DIALOG — premium redesign
       ============================================================ */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[92vh] max-w-3xl overflow-hidden gap-0 p-0">
           {selectedAdmission && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-3">
-                  {selectedAdmission.passportPhotoUrl ? (
-                    <img
-                      src={selectedAdmission.passportPhotoUrl}
-                      alt=""
-                      className="h-12 w-12 rounded-full object-cover ring-2 ring-slate-100"
-                    />
-                  ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-navy text-sm font-bold text-brand-gold ring-2 ring-slate-100">
-                      {getInitials(selectedAdmission.firstName, selectedAdmission.lastName)}
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-lg font-bold text-slate-950">
-                      {selectedAdmission.firstName} {selectedAdmission.middleName && `${selectedAdmission.middleName} `}{" "}
-                      {selectedAdmission.lastName}
-                    </p>
-                    <p className="text-sm text-slate-500">{selectedAdmission.applicationNumber}</p>
-                  </div>
-                </DialogTitle>
-              </DialogHeader>
+            <div className="flex max-h-[92vh] flex-col">
+              {/* -------------------------------------------------
+                  RECORD BANNER
+              ------------------------------------------------- */}
+              <div className="relative shrink-0 overflow-hidden bg-brand-navy px-6 pb-6 pt-7 sm:px-8">
+                <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand-gold/10 blur-3xl" />
+                <div
+                  className="
+                    pointer-events-none absolute inset-0 opacity-[0.04]
+                    [background-image:linear-gradient(rgba(255,255,255,1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,1)_1px,transparent_1px)]
+                    [background-size:28px_28px]
+                  "
+                />
 
-              <div className="space-y-6">
-                {/* Status Actions */}
-                <div className="flex items-center justify-between rounded-xl bg-slate-50 p-4">
-                  <div className="flex items-center gap-3">
-                    {getStatusBadge(selectedAdmission.status)}
-                    {selectedAdmission.matricNumber && (
-                      <div className="flex items-center gap-2 text-xs font-medium text-emerald-700">
-                        <GraduationCap className="h-3.5 w-3.5" />
-                        Matric: {selectedAdmission.matricNumber}
+                <DialogHeader className="relative">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <SafeImage
+                        src={getPassportPhoto(selectedAdmission)}
+                        alt=""
+                        className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-brand-gold/40 sm:h-20 sm:w-20"
+                        fallback={
+                          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/10 text-lg font-bold text-brand-gold ring-2 ring-brand-gold/40 sm:h-20 sm:w-20 sm:text-xl">
+                            {getInitials(selectedAdmission.otherNames, selectedAdmission.surname)}
+                          </div>
+                        }
+                      />
+                      <div className="min-w-0 text-left">
+                        <DialogTitle className="truncate font-serif text-xl font-semibold text-white sm:text-2xl">
+                          {getFullName(selectedAdmission)}
+                        </DialogTitle>
+                        <p className="mt-1 font-mono text-xs text-slate-300">
+                          {selectedAdmission.applicationNumber}
+                        </p>
+                        <p className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-300">
+                          <Mail className="h-3 w-3" />
+                          {selectedAdmission.email}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      {getStatusBadge(selectedAdmission.status)}
+                      {selectedAdmission.matricNumber && (
+                        <div className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-brand-gold ring-1 ring-white/10">
+                          <GraduationCap className="h-3 w-3" />
+                          {selectedAdmission.matricNumber}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </DialogHeader>
+              </div>
+
+              {/* -------------------------------------------------
+                  ACTION BAR
+              ------------------------------------------------- */}
+              {(selectedAdmission.status === "PENDING" || selectedAdmission.status === "UNDER_REVIEW") && (
+                <div className="flex shrink-0 items-center justify-end gap-2 border-b border-slate-100 bg-slate-50/80 px-6 py-3 backdrop-blur-sm sm:px-8">
+                  <button
+                    type="button"
+                    onClick={() => openRejectDialog(selectedAdmission)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <XCircle className="h-3.5 w-3.5" />
+                    Reject
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openApproveDialog(selectedAdmission)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Approve application
+                  </button>
+                </div>
+              )}
+
+              {/* -------------------------------------------------
+                  SCROLLABLE RECORD BODY
+              ------------------------------------------------- */}
+              <div className="flex-1 overflow-y-auto px-6 py-6 sm:px-8">
+                <div className="divide-y divide-slate-100">
+                  {/* Applicant Information */}
+                  <section className="pb-6">
+                    <SectionHeading icon={Users} title="Applicant information" />
+                    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                      <InfoField label="Full name" value={getFullName(selectedAdmission)} />
+                      <InfoField label="Email" value={selectedAdmission.email} icon={Mail} />
+                      <InfoField label="Phone" value={selectedAdmission.telephone} icon={Phone} />
+                      <InfoField
+                        label="Date of birth"
+                        value={selectedAdmission.dateOfBirth ? formatDateShort(selectedAdmission.dateOfBirth) : undefined}
+                        icon={Calendar}
+                      />
+                      <InfoField label="Nationality" value={selectedAdmission.nationality} />
+                      <InfoField
+                        label="Address"
+                        value={selectedAdmission.residentialAddress || selectedAdmission.postalAddress}
+                        icon={MapPin}
+                        span
+                      />
+                    </div>
+                  </section>
+
+                  {/* Admission Information */}
+                  <section className="py-6">
+                    <SectionHeading icon={FileText} title="Admission information" />
+                    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                      <InfoField
+                        label="Programme"
+                        value={selectedAdmission.programme?.name}
+                        icon={BookOpen}
+                      />
+                      <InfoField label="Department" value={selectedAdmission.department?.name} />
+                      <InfoField label="Academic session" value={selectedAdmission.academicSession?.name} />
+                      <InfoField label="Submitted" value={formatDate(selectedAdmission.submittedAt)} />
+                      {selectedAdmission.reviewedAt && (
+                        <InfoField label="Reviewed" value={formatDate(selectedAdmission.reviewedAt)} />
+                      )}
+                    </div>
+                    {selectedAdmission.rejectionReason && (
+                      <div className="mt-4 rounded-r-lg border-l-4 border-red-300 bg-red-50/70 py-2.5 pl-4 pr-3">
+                        <p className="text-xs font-medium text-red-600">Rejection reason</p>
+                        <p className="mt-0.5 text-sm text-red-800">{selectedAdmission.rejectionReason}</p>
                       </div>
                     )}
-                  </div>
+                  </section>
 
-                  {(selectedAdmission.status === "PENDING" || selectedAdmission.status === "UNDER_REVIEW") && (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openApproveDialog(selectedAdmission)}
-                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openRejectDialog(selectedAdmission)}
-                        className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-700"
-                      >
-                        <XCircle className="h-3.5 w-3.5" />
-                        Reject
-                      </button>
-                    </div>
+                  {/* Uploaded Documents */}
+                  {selectedAdmission.documents && selectedAdmission.documents.length > 0 && (
+                    <section className="py-6">
+                      <SectionHeading icon={Paperclip} title="Uploaded documents" />
+                      <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+                        {selectedAdmission.documents.map((doc, index) => (
+                          <a
+                            key={`${doc.type}-${index}`}
+                            href={doc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 bg-white px-4 py-3 transition-colors hover:bg-slate-50"
+                          >
+                            <SafeImage
+                              src={doc.url}
+                              alt={getDocumentLabel(doc.type)}
+                              className="h-11 w-11 shrink-0 rounded-lg object-cover ring-1 ring-slate-200"
+                              fallback={
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-400 ring-1 ring-slate-200">
+                                  <FileText className="h-4.5 w-4.5" />
+                                </div>
+                              }
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-slate-900">
+                                {getDocumentLabel(doc.type)}
+                              </p>
+                              <p className="truncate text-xs text-slate-500">{doc.filename}</p>
+                            </div>
+                            <span className="hidden shrink-0 items-center gap-1 text-xs font-semibold text-brand-navy sm:flex">
+                              View document
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </span>
+                            <ExternalLink className="h-4 w-4 shrink-0 text-slate-400 sm:hidden" />
+                          </a>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Education Records */}
+                  {selectedAdmission.educationRecords && selectedAdmission.educationRecords.length > 0 && (
+                    <section className="py-6">
+                      <SectionHeading icon={GraduationCap} title="Education history" />
+                      <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+                        {selectedAdmission.educationRecords.map((edu, index) => (
+                          <div key={index} className="bg-white px-4 py-3">
+                            <div className="flex items-baseline justify-between gap-4">
+                              <p className="text-sm font-semibold text-slate-900">{edu.schoolAttended}</p>
+                              {edu.dateObtained && (
+                                <p className="shrink-0 text-xs text-slate-400">{edu.dateObtained}</p>
+                              )}
+                            </div>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {edu.certificate}
+                              {edu.grade ? ` · ${edu.grade}` : ""}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Referees */}
+                  {selectedAdmission.referees && selectedAdmission.referees.length > 0 && (
+                    <section className="py-6">
+                      <SectionHeading icon={Users} title="Referees" />
+                      <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+                        {selectedAdmission.referees.map((referee, index) => (
+                          <div key={index} className="bg-white px-4 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-slate-900">{referee.name}</p>
+                              <div className="flex items-center gap-1.5">
+                                {referee.relationship && (
+                                  <span className="text-xs text-slate-500">{referee.relationship}</span>
+                                )}
+                                {isGuardianOrSponsor(referee) && (
+                                  <Badge className="rounded-full border-0 bg-brand-navy px-2 py-0.5 text-[10px] font-semibold text-brand-gold">
+                                    Guardian / Sponsor
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                              {referee.phone && (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {referee.phone}
+                                </span>
+                              )}
+                              {referee.address && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {referee.address}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Additional Information */}
+                  {(selectedAdmission.medicalCondition || selectedAdmission.referredBy) && (
+                    <section className="pt-6">
+                      <SectionHeading icon={FileText} title="Additional information" />
+                      <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                        <InfoField label="Medical condition" value={selectedAdmission.medicalCondition} span />
+                        <InfoField label="Referred by" value={selectedAdmission.referredBy} />
+                      </div>
+                    </section>
                   )}
                 </div>
-
-                {/* Applicant Information */}
-                <div>
-                  <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-950">
-                    <Users className="h-4 w-4 text-brand-navy" />
-                    Applicant Information
-                  </h3>
-                  <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Full Name</p>
-                      <p className="mt-1 text-sm font-medium text-slate-900">
-                    {selectedAdmission.firstName} {selectedAdmission.middleName && `${selectedAdmission.middleName} `}{" "}
-                    {selectedAdmission.lastName}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Email</p>
-                  <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-900">
-                    <Mail className="h-3.5 w-3.5 text-slate-400" />
-                    {selectedAdmission.email}
-                  </p>
-                </div>
-                {selectedAdmission.phone && (
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Phone</p>
-                    <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-900">
-                      <Phone className="h-3.5 w-3.5 text-slate-400" />
-                      {selectedAdmission.phone}
-                    </p>
-                  </div>
-                )}
-                {selectedAdmission.dateOfBirth && (
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Date of Birth</p>
-                    <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-900">
-                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                      {formatDateShort(selectedAdmission.dateOfBirth)}
-                    </p>
-                  </div>
-                )}
-                {selectedAdmission.gender && (
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Gender</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">{selectedAdmission.gender}</p>
-                  </div>
-                )}
-                {selectedAdmission.nationality && (
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Nationality</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">{selectedAdmission.nationality}</p>
-                  </div>
-                )}
-                {(selectedAdmission.postalAddress || selectedAdmission.residentialAddress) && (
-                  <div className="sm:col-span-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Address</p>
-                    <p className="mt-1 flex items-start gap-1.5 text-sm font-medium text-slate-900">
-                      <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
-                      {selectedAdmission.residentialAddress || selectedAdmission.postalAddress}
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
-
-            {/* Admission Information */}
-            <div>
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-950">
-                <FileText className="h-4 w-4 text-brand-navy" />
-                Admission Information
-              </h3>
-              <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Application Number</p>
-                  <p className="mt-1 font-mono text-sm font-semibold text-brand-navy">
-                    {selectedAdmission.applicationNumber}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</p>
-                  <p className="mt-1">{getStatusBadge(selectedAdmission.status)}</p>
-                </div>
-                {selectedAdmission.programme && (
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Programme</p>
-                    <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-900">
-                      <BookOpen className="h-3.5 w-3.5 text-slate-400" />
-                      {selectedAdmission.programme.name}
-                    </p>
-                  </div>
-                )}
-                {selectedAdmission.department && (
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Department</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">{selectedAdmission.department.name}</p>
-                  </div>
-                )}
-                {selectedAdmission.academicSession && (
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Academic Session</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">{selectedAdmission.academicSession.name}</p>
-                  </div>
-                )}
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Submitted</p>
-                  <p className="mt-1 text-sm font-medium text-slate-900">{formatDate(selectedAdmission.submittedAt)}</p>
-                </div>
-                {selectedAdmission.reviewedAt && (
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Reviewed</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">{formatDate(selectedAdmission.reviewedAt)}</p>
-                  </div>
-                )}
-                {selectedAdmission.rejectionReason && (
-                  <div className="sm:col-span-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Rejection Reason</p>
-                    <p className="mt-1 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">
-                      {selectedAdmission.rejectionReason}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Education History */}
-            {selectedAdmission.educationHistory && selectedAdmission.educationHistory.length > 0 && (
-              <div>
-                <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-950">
-                  <GraduationCap className="h-4 w-4 text-brand-navy" />
-                  Education History
-                </h3>
-                <div className="space-y-3">
-                  {selectedAdmission.educationHistory.map((edu, index) => (
-                    <div key={index} className="rounded-xl border border-slate-200 bg-white p-4">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">School Attended</p>
-                          <p className="mt-1 text-sm font-medium text-slate-900">{edu.schoolAttended}</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Certificate</p>
-                          <p className="mt-1 text-sm font-medium text-slate-900">{edu.certificateObtained}</p>
-                        </div>
-                        {edu.dateObtained && (
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Date Obtained</p>
-                            <p className="mt-1 text-sm font-medium text-slate-900">{edu.dateObtained}</p>
-                          </div>
-                        )}
-                        {edu.grade && (
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Grade</p>
-                            <p className="mt-1 text-sm font-medium text-slate-900">{edu.grade}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Referees */}
-            {selectedAdmission.referees && selectedAdmission.referees.length > 0 && (
-              <div>
-                <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-950">
-                  <Users className="h-4 w-4 text-brand-navy" />
-                  Referees
-                </h3>
-                <div className="space-y-3">
-                  {selectedAdmission.referees.map((referee, index) => (
-                    <div key={index} className="rounded-xl border border-slate-200 bg-white p-4">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Name</p>
-                          <p className="mt-1 text-sm font-medium text-slate-900">{referee.name}</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Phone</p>
-                          <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-900">
-                            <Phone className="h-3.5 w-3.5 text-slate-400" />
-                            {referee.phone}
-                          </p>
-                        </div>
-                        <div className="sm:col-span-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Address</p>
-                          <p className="mt-1 flex items-start gap-1.5 text-sm font-medium text-slate-900">
-                            <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
-                            {referee.address}
-                          </p>
-                        </div>
-                        {referee.isGuardianOrSponsor && (
-                          <div className="sm:col-span-2">
-                            <Badge className="bg-brand-navy text-brand-gold">Guardian / Sponsor</Badge>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Additional Information */}
-            {(selectedAdmission.medicalCondition || selectedAdmission.referredBy) && (
-              <div>
-                <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-950">
-                  <FileText className="h-4 w-4 text-brand-navy" />
-                  Additional Information
-                </h3>
-                <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
-                  {selectedAdmission.medicalCondition && (
-                    <div className="sm:col-span-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Medical Condition</p>
-                      <p className="mt-1 text-sm font-medium text-slate-900">{selectedAdmission.medicalCondition}</p>
-                    </div>
-                  )}
-                  {selectedAdmission.referredBy && (
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Referred By</p>
-                      <p className="mt-1 text-sm font-medium text-slate-900">{selectedAdmission.referredBy}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </DialogContent>
-  </Dialog>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ============================================================
           APPROVE CONFIRMATION DIALOG
@@ -1097,10 +1144,7 @@ export default function RegistrarAdmissionsClient({
             <AlertDialogTitle>Approve Admission</AlertDialogTitle>
             <AlertDialogDescription>
               You are about to approve the admission application for{" "}
-              <strong>
-                {selectedAdmission?.firstName} {selectedAdmission?.lastName}
-              </strong>
-              . This action will:
+              <strong>{getFullName(selectedAdmission)}</strong>. This action will:
               <ul className="mt-2 ml-4 list-disc space-y-1 text-slate-600">
                 <li>Update the admission status to APPROVED</li>
                 <li>Generate a matric number for the student</li>
@@ -1138,10 +1182,7 @@ export default function RegistrarAdmissionsClient({
             <AlertDialogTitle>Reject Admission</AlertDialogTitle>
             <AlertDialogDescription>
               You are about to reject the admission application for{" "}
-              <strong>
-                {selectedAdmission?.firstName} {selectedAdmission?.lastName}
-              </strong>
-              . Please provide a reason for rejection.
+              <strong>{getFullName(selectedAdmission)}</strong>. Please provide a reason for rejection.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4">

@@ -1,19 +1,39 @@
+
+
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/auth";
 import { apiGet } from "@/lib/api";
 import RegistrarAdmissionsClient from "./registrar-admissions-client";
 
+interface AdmissionDocument {
+  type: string;
+  filename: string;
+  url: string;
+}
+
+interface Referee {
+  name: string;
+  address?: string;
+  phone?: string;
+  relationship?: string;
+}
+
+interface EducationRecord {
+  schoolAttended: string;
+  certificate: string;
+  dateObtained?: string;
+  grade?: string;
+}
+
 interface Admission {
   _id: string;
   applicationNumber: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
+  surname: string;
+  otherNames: string;
   email: string;
-  phone?: string;
+  telephone?: string;
   dateOfBirth?: string;
-  gender?: string;
   nationality?: string;
   postalAddress?: string;
   residentialAddress?: string;
@@ -27,9 +47,9 @@ interface Admission {
   student?: { _id: string; name: string };
   matricNumber?: string;
   rejectionReason?: string;
-  referees?: Array<{ name: string; address: string; phone: string; isGuardianOrSponsor: boolean }>;
-  educationHistory?: Array<{ schoolAttended: string; certificateObtained: string; dateObtained?: string; grade?: string }>;
-  passportPhotoUrl?: string;
+  referees?: Referee[];
+  educationRecords?: EducationRecord[];
+  documents?: AdmissionDocument[];
   medicalCondition?: string;
   referredBy?: string;
   createdAt: string;

@@ -24,6 +24,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  User,
   UserCheck,
   Users,
   X,
@@ -152,7 +153,7 @@ const navigation: NavSection[] = [
     items: [
       {
         label: "Academic Reports",
-        href: "/dashboards/registrar/reports",
+        href: "/dashboards/registrar/academic-reports",
         icon: FileText,
         description: "Academic reports and statistics",
       },
@@ -173,6 +174,12 @@ const navigation: NavSection[] = [
         href: "/dashboards/registrar/announcements",
         icon: Megaphone,
         description: "Academic announcements",
+      },
+      {
+        label: "Notifications",
+        href: "/dashboards/registrar/notifications",
+        icon: Megaphone,
+        description: "Academic notifications",
       },
     ],
   },
@@ -201,7 +208,10 @@ function isActiveRoute(pathname: string, href: string) {
     return pathname === href;
   }
 
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return (
+    pathname === href ||
+    pathname.startsWith(`${href}/`)
+  );
 }
 
 export default function RegistrarSidebar({
@@ -213,25 +223,18 @@ export default function RegistrarSidebar({
   const pathname = usePathname();
   const { data: session } = useSession();
 
-  /*
-   * Internal collapse state.
-   *
-   * This means the sidebar works even if the parent
-   * does not provide collapsed/onCollapsedChange.
-   */
   const [internalCollapsed, setInternalCollapsed] =
     useState(false);
 
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] =
+    useState(false);
+
   const [logoutModalOpen, setLogoutModalOpen] =
     useState(false);
+
   const [isLoggingOut, setIsLoggingOut] =
     useState(false);
 
-  /*
-   * If the parent controls collapsed state, use it.
-   * Otherwise use our internal state.
-   */
   const collapsed =
     controlledCollapsed ?? internalCollapsed;
 
@@ -244,8 +247,12 @@ export default function RegistrarSidebar({
       setInternalCollapsed(nextValue);
     }
 
-    // Close profile menu when sidebar changes size.
     setProfileOpen(false);
+  };
+
+  const closeProfileMenu = () => {
+    setProfileOpen(false);
+    onMobileClose?.();
   };
 
   const registrarName =
@@ -292,11 +299,6 @@ export default function RegistrarSidebar({
     }
   };
 
-  const handleSettings = () => {
-    setProfileOpen(false);
-    onMobileClose?.();
-  };
-
   return (
     <>
       {/* =========================================================
@@ -321,11 +323,7 @@ export default function RegistrarSidebar({
           "shadow-2xl shadow-black/20",
           "transition-[width,transform] duration-300 ease-in-out",
           "lg:translate-x-0",
-
-          collapsed
-            ? "lg:w-20"
-            : "lg:w-72",
-
+          collapsed ? "lg:w-20" : "lg:w-72",
           mobileOpen
             ? "w-72 translate-x-0"
             : "w-72 -translate-x-full",
@@ -402,11 +400,10 @@ export default function RegistrarSidebar({
 
                 <div className="space-y-1">
                   {section.items.map((item) => {
-                    const active =
-                      isActiveRoute(
-                        pathname,
-                        item.href,
-                      );
+                    const active = isActiveRoute(
+                      pathname,
+                      item.href,
+                    );
 
                     const Icon = item.icon;
 
@@ -423,11 +420,9 @@ export default function RegistrarSidebar({
                         className={cn(
                           "group relative flex items-center rounded-xl",
                           "transition-all duration-200",
-
                           collapsed
                             ? "justify-center px-2 py-3"
                             : "gap-3 px-3 py-2.5",
-
                           active
                             ? "bg-white/10 text-white shadow-sm"
                             : "text-white/60 hover:bg-white/[0.06] hover:text-white",
@@ -440,7 +435,6 @@ export default function RegistrarSidebar({
                         <span
                           className={cn(
                             "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all duration-200",
-
                             active
                               ? "bg-brand-gold text-brand-navy shadow-md shadow-brand-gold/10"
                               : "bg-white/[0.04] text-white/55 group-hover:bg-white/[0.08] group-hover:text-white",
@@ -477,9 +471,7 @@ export default function RegistrarSidebar({
         ======================================================= */}
         <div className="relative shrink-0 border-t border-white/10 p-3">
 
-          {/* =====================================================
-              COLLAPSE BUTTON
-          ===================================================== */}
+          {/* COLLAPSE BUTTON */}
           <button
             type="button"
             onClick={handleCollapse}
@@ -495,7 +487,6 @@ export default function RegistrarSidebar({
               "focus:outline-none",
               "focus:ring-2",
               "focus:ring-brand-gold/30",
-
               collapsed
                 ? "justify-center px-2 py-3"
                 : "gap-3 px-3 py-2.5",
@@ -540,13 +531,12 @@ export default function RegistrarSidebar({
                   "bg-[#101c32]/95 backdrop-blur-xl",
                   "shadow-2xl shadow-black/40",
                   "animate-in fade-in slide-in-from-bottom-2 duration-200",
-
                   collapsed
                     ? "left-14 w-64"
                     : "left-0 right-0",
                 )}
               >
-                {/* Profile header */}
+                {/* PROFILE HEADER */}
                 <div className="border-b border-white/10 p-4">
                   <div className="flex items-center gap-3">
                     <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-brand-gold text-brand-navy shadow-lg shadow-brand-gold/10">
@@ -577,25 +567,67 @@ export default function RegistrarSidebar({
                   </div>
                 </div>
 
-                {/* Menu */}
+                {/* MENU */}
                 <div className="p-2">
 
-                  {/* SETTINGS */}
+                  {/* =================================================
+                      MY PROFILE
+                  ================================================= */}
+                  <Link
+                    href="/dashboards/registrar/profile"
+                    onClick={closeProfileMenu}
+                    className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-white/70 transition hover:bg-white/[0.07] hover:text-white"
+                  >
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.05] transition group-hover:bg-brand-gold group-hover:text-brand-navy">
+                      <User className="h-4 w-4" />
+                    </span>
+
+                    <span className="flex-1">
+                      <span className="block text-sm font-medium">
+                        My Profile
+                      </span>
+
+                      <span className="mt-0.5 block text-[10px] text-white/35">
+                        Manage your profile
+                      </span>
+                    </span>
+
+                    <ChevronRight className="h-4 w-4 text-white/25 transition-transform group-hover:translate-x-0.5 group-hover:text-white/60" />
+                  </Link>
+
+                  {/* =================================================
+                      SETTINGS
+                  ================================================= */}
                   <Link
                     href="/dashboards/registrar/settings"
-                    onClick={handleSettings}
+                    onClick={closeProfileMenu}
                     className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-white/70 transition hover:bg-white/[0.07] hover:text-white"
                   >
                     <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.05] transition group-hover:bg-brand-gold group-hover:text-brand-navy">
                       <Settings className="h-4 w-4" />
                     </span>
 
-                    <span className="text-sm font-medium">
-                      Settings
+                    <span className="flex-1">
+                      <span className="block text-sm font-medium">
+                        Settings
+                      </span>
+
+                      <span className="mt-0.5 block text-[10px] text-white/35">
+                        Preferences and security
+                      </span>
                     </span>
+
+                    <ChevronRight className="h-4 w-4 text-white/25 transition-transform group-hover:translate-x-0.5 group-hover:text-white/60" />
                   </Link>
 
-                  {/* SIGN OUT */}
+                  {/* =================================================
+                      DIVIDER
+                  ================================================= */}
+                  <div className="my-2 border-t border-white/[0.07]" />
+
+                  {/* =================================================
+                      SIGN OUT
+                  ================================================= */}
                   <button
                     type="button"
                     onClick={openLogoutModal}
@@ -605,8 +637,14 @@ export default function RegistrarSidebar({
                       <LogOut className="h-4 w-4" />
                     </span>
 
-                    <span className="text-sm font-medium">
-                      Sign out
+                    <span className="flex-1 text-left">
+                      <span className="block text-sm font-medium">
+                        Sign out
+                      </span>
+
+                      <span className="mt-0.5 block text-[10px] text-white/35 group-hover:text-red-300/50">
+                        End current session
+                      </span>
                     </span>
                   </button>
                 </div>
@@ -631,7 +669,6 @@ export default function RegistrarSidebar({
                 "focus:outline-none",
                 "focus:ring-2",
                 "focus:ring-brand-gold/30",
-
                 collapsed
                   ? "justify-center p-2"
                   : "gap-3 px-2.5 py-2.5",
@@ -642,6 +679,7 @@ export default function RegistrarSidebar({
                   : undefined
               }
               aria-expanded={profileOpen}
+              aria-haspopup="menu"
             >
               {/* AVATAR */}
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-brand-gold text-brand-navy shadow-lg shadow-brand-gold/10 ring-1 ring-white/10">
@@ -803,4 +841,3 @@ export default function RegistrarSidebar({
     </>
   );
 }
-
