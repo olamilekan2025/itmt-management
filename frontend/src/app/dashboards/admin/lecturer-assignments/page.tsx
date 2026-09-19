@@ -25,6 +25,7 @@ import {
 
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
+import { AdminTableSkeleton } from "@/components/dashboard/admin/skeletons/admin-table-skeleton";
 
 import { Button } from "@/components/ui/button";
 
@@ -421,19 +422,7 @@ export default function AdminLecturerDetailsPage() {
     status === "loading" ||
     loading
   ) {
-    return (
-      <div className="flex min-h-[500px] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-navy/10">
-            <Loader2 className="h-6 w-6 animate-spin text-brand-navy" />
-          </div>
-
-          <p className="text-sm text-slate-500">
-            Loading lecturer details...
-          </p>
-        </div>
-      </div>
-    );
+    return <AdminTableSkeleton />;
   }
 
   /* =========================================================

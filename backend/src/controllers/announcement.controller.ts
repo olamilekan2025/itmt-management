@@ -1,15 +1,19 @@
 import type {
-  Request,
   Response,
 } from "express";
 
 import { z } from "zod";
 
-import type { AuthRequest } from "../middleware/auth.middleware.js";
+import type {
+  AuthRequest,
+} from "../middleware/auth.middleware.js";
 
 import Announcement from "../models/Announcement.js";
 
-import { notifyAdmins, notifyByRole } from "../services/notification.service.js";
+import {
+  notifyAdmins,
+  notifyByRole,
+} from "../services/notification.service.js";
 
 /* =========================================================
    VALIDATION
@@ -137,25 +141,106 @@ const announcementQuerySchema =
     search: z
       .string()
       .trim()
+      .max(
+        200,
+        "Search cannot exceed 200 characters",
+      )
       .optional(),
   });
 
 /* =========================================================
-   HELPER
+   AUDIENCE HELPERS
 ========================================================= */
 
-/*
- * Finance can see published announcements with audience:
- * everyone, staff, or finance — matching the access rule
- * enforced in getAllAnnouncements / getAnnouncementById.
- */
-function isVisibleToFinance(audience: string) {
-  return ["everyone", "staff", "finance"].includes(audience);
+function isVisibleToFinance(
+  audience: string,
+): boolean {
+  return [
+    "everyone",
+    "staff",
+    "finance",
+  ].includes(audience);
+}
+
+function isVisibleToLecturers(
+  audience: string,
+): boolean {
+  return [
+    "everyone",
+    "lecturers",
+  ].includes(audience);
+}
+
+/* =========================================================
+   NOTIFY FINANCE
+========================================================= */
+
+async function notifyFinanceIfNeeded(
+  audience: string,
+  title: string,
+  announcementId: string,
+) {
+  if (
+    !isVisibleToFinance(audience)
+  ) {
+    return;
+  }
+
+  await notifyByRole(
+    "finance",
+    {
+      title:
+        "New Announcement",
+      message:
+        `"${title}" has been published.`,
+      type:
+        "announcement",
+      link:
+        "/dashboards/finance/announcements",
+      metadata: {
+        announcementId,
+      },
+    },
+  );
+}
+
+/* =========================================================
+   NOTIFY LECTURERS
+========================================================= */
+
+async function notifyLecturersIfNeeded(
+  audience: string,
+  title: string,
+  announcementId: string,
+) {
+  if (
+    !isVisibleToLecturers(
+      audience,
+    )
+  ) {
+    return;
+  }
+
+  await notifyByRole(
+    "lecturer",
+    {
+      title:
+        "New Announcement",
+      message:
+        `"${title}" has been published.`,
+      type:
+        "announcement",
+      link:
+        "/dashboards/lecturer/announcements",
+      metadata: {
+        announcementId,
+      },
+    },
+  );
 }
 
 /* =========================================================
    GET ALL ANNOUNCEMENTS
-   ADMIN / REGISTRAR / FINANCE
 ========================================================= */
 
 export async function getAllAnnouncements(
@@ -167,19 +252,19 @@ export async function getAllAnnouncements(
       announcementQuerySchema.safeParse({
         status:
           typeof req.query.status ===
-          "string"
+            "string"
             ? req.query.status
             : undefined,
 
         audience:
           typeof req.query.audience ===
-          "string"
+            "string"
             ? req.query.audience
             : undefined,
 
         search:
           typeof req.query.search ===
-          "string"
+            "string"
             ? req.query.search
             : undefined,
       });
@@ -201,25 +286,21 @@ export async function getAllAnnouncements(
       search,
     } = parsed.data;
 
-    const role = req.user?.role;
+    const role =
+      req.user?.role;
 
-       const filter: Record<string, unknown> = {};
+    const filter:
+      Record<string, unknown> = {};
 
     /* =====================================================
-       FINANCE ACCESS RULE
-       
-       Finance can ONLY see:
-       - published announcements
-       - everyone
-       - staff
-       - finance
-       
-       Finance cannot use query parameters to bypass
-       these restrictions.
+       FINANCE
     ====================================================== */
 
-    if (role === "finance") {
-      filter.status = "published";
+    if (
+      role === "finance"
+    ) {
+      filter.status =
+        "published";
 
       filter.audience = {
         $in: [
@@ -228,19 +309,50 @@ export async function getAllAnnouncements(
           "finance",
         ],
       };
-    } else {
-      /* ===================================================
-         ADMIN / REGISTRAR
-         
-         Admin and registrar can use the normal filters.
-      ==================================================== */
+    }
 
+    /* =====================================================
+       LECTURER
+    ====================================================== */
+
+    else if (
+      role === "lecturer"
+    ) {
+      /*
+       * These values are deliberately forced.
+       *
+       * A lecturer cannot bypass this by requesting:
+       *
+       * ?status=draft
+       * ?audience=finance
+       *
+       * because their role determines the filter.
+       */
+
+      filter.status =
+        "published";
+
+      filter.audience = {
+        $in: [
+          "everyone",
+          "lecturers",
+        ],
+      };
+    }
+
+    /* =====================================================
+       ADMIN / REGISTRAR
+    ====================================================== */
+
+    else {
       if (status) {
-        filter.status = status;
+        filter.status =
+          status;
       }
 
       if (audience) {
-        filter.audience = audience;
+        filter.audience =
+          audience;
       }
     }
 
@@ -266,7 +378,9 @@ export async function getAllAnnouncements(
     }
 
     const announcements =
-      await Announcement.find(filter)
+      await Announcement.find(
+        filter,
+      )
         .populate(
           "createdBy",
           "name email role",
@@ -295,7 +409,6 @@ export async function getAllAnnouncements(
 
 /* =========================================================
    GET SINGLE ANNOUNCEMENT
-   ADMIN / REGISTRAR / FINANCE
 ========================================================= */
 
 export async function getAnnouncementById(
@@ -303,9 +416,13 @@ export async function getAnnouncementById(
   res: Response,
 ) {
   try {
-    const { id } = req.params;
+    const { id } =
+      req.params;
 
-    if (!objectId.safeParse(id).success) {
+    if (
+      !objectId.safeParse(id)
+        .success
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -314,7 +431,9 @@ export async function getAnnouncementById(
     }
 
     const announcement =
-      await Announcement.findById(id).populate(
+      await Announcement.findById(
+        id,
+      ).populate(
         "createdBy",
         "name email role",
       );
@@ -329,21 +448,40 @@ export async function getAnnouncementById(
 
     /* =====================================================
        FINANCE SECURITY
-       
-       Finance cannot access drafts or archived announcements,
-       and cannot access announcements intended for another
-       audience.
     ====================================================== */
 
-    if (req.user?.role === "finance") {
+    if (
+      req.user?.role ===
+      "finance"
+    ) {
       const canView =
         announcement.status ===
-          "published" &&
-        [
-          "everyone",
-          "staff",
-          "finance",
-        ].includes(
+        "published" &&
+        isVisibleToFinance(
+          announcement.audience,
+        );
+
+      if (!canView) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You are not authorized to view this announcement",
+        });
+      }
+    }
+
+    /* =====================================================
+       LECTURER SECURITY
+    ====================================================== */
+
+    if (
+      req.user?.role ===
+      "lecturer"
+    ) {
+      const canView =
+        announcement.status ===
+        "published" &&
+        isVisibleToLecturers(
           announcement.audience,
         );
 
@@ -376,7 +514,6 @@ export async function getAnnouncementById(
 
 /* =========================================================
    CREATE ANNOUNCEMENT
-   ADMIN
 ========================================================= */
 
 export async function createAnnouncement(
@@ -391,11 +528,24 @@ export async function createAnnouncement(
 
     const announcement =
       await Announcement.create({
-        ...data,
-        createdBy: req.user!.userId,
+        title:
+          data.title,
+
+        content:
+          data.content,
+
+        audience:
+          data.audience,
+
+        status:
+          data.status,
+
+        createdBy:
+          req.user!.userId,
 
         publishedAt:
-          data.status === "published"
+          data.status ===
+            "published"
             ? new Date()
             : undefined,
       });
@@ -405,33 +555,54 @@ export async function createAnnouncement(
       "name email role",
     );
 
-    /*
-     * Notify administrators only when
-     * an announcement is published immediately.
-     */
+    /* =====================================================
+       NOTIFY WHEN IMMEDIATELY PUBLISHED
+    ====================================================== */
 
-    if (data.status === "published") {
+    if (
+      data.status ===
+      "published"
+    ) {
+      const announcementId =
+        announcement._id.toString();
+
+      /* ---------------------------------------------------
+         ADMIN
+      --------------------------------------------------- */
+
       await notifyAdmins({
         title:
           "New Announcement Published",
-        message: `"${data.title}" has been published.`,
-        type: "announcement",
+        message:
+          `"${data.title}" has been published.`,
+        type:
+          "announcement",
         link:
           "/dashboards/admin/announcements",
+        metadata: {
+          announcementId,
+        },
       });
 
-      /*
-       * Also notify finance users when the
-       * announcement's audience includes them.
-       */
-      if (isVisibleToFinance(data.audience)) {
-        await notifyByRole("finance", {
-          title: "New Announcement",
-          message: `"${data.title}" has been published.`,
-          type: "announcement",
-          link: "/dashboards/finance/announcements",
-        });
-      }
+      /* ---------------------------------------------------
+         FINANCE
+      --------------------------------------------------- */
+
+      await notifyFinanceIfNeeded(
+        data.audience,
+        data.title,
+        announcementId,
+      );
+
+      /* ---------------------------------------------------
+         LECTURERS
+      --------------------------------------------------- */
+
+      await notifyLecturersIfNeeded(
+        data.audience,
+        data.title,
+        announcementId,
+      );
     }
 
     return res.status(201).json({
@@ -442,7 +613,8 @@ export async function createAnnouncement(
     });
   } catch (error) {
     if (
-      error instanceof z.ZodError
+      error instanceof
+      z.ZodError
     ) {
       return res.status(400).json({
         success: false,
@@ -469,7 +641,6 @@ export async function createAnnouncement(
 
 /* =========================================================
    UPDATE ANNOUNCEMENT
-   ADMIN
 ========================================================= */
 
 export async function updateAnnouncement(
@@ -477,9 +648,13 @@ export async function updateAnnouncement(
   res: Response,
 ) {
   try {
-    const { id } = req.params;
+    const { id } =
+      req.params;
 
-    if (!objectId.safeParse(id).success) {
+    if (
+      !objectId.safeParse(id)
+        .success
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -493,7 +668,9 @@ export async function updateAnnouncement(
       );
 
     const existing =
-      await Announcement.findById(id);
+      await Announcement.findById(
+        id,
+      );
 
     if (!existing) {
       return res.status(404).json({
@@ -504,34 +681,52 @@ export async function updateAnnouncement(
     }
 
     const wasPublished =
-      existing.status === "published";
-
-    const willBePublished =
-      data.status === "published" ||
-      (!data.status &&
-        wasPublished);
-
-     const updateData: Record<string, unknown> = { ...data };
+      existing.status ===
+      "published";
 
     /*
-     * Set publishedAt when becoming published
-     * for the first time.
+     * We only send a "published" notification when
+     * the announcement changes from a non-published
+     * state to published.
+     *
+     * Editing an already-published announcement
+     * will NOT send another notification.
      */
 
+    const willBePublished =
+      data.status ===
+      "published" ||
+      (
+        data.status ===
+        undefined &&
+        wasPublished
+      );
+
+    const updateData:
+      Record<string, unknown> = {
+      ...data,
+    };
+
+    /* =====================================================
+       PUBLISHED DATE
+    ====================================================== */
+
     if (
-      data.status === "published" &&
+      data.status ===
+      "published" &&
       !existing.publishedAt
     ) {
       updateData.publishedAt =
         new Date();
     }
 
-    /*
-     * Moving back to draft removes publishedAt.
-     */
+    /* =====================================================
+       MOVING BACK TO DRAFT
+    ====================================================== */
 
     if (
-      data.status === "draft"
+      data.status ===
+      "draft"
     ) {
       updateData.publishedAt =
         undefined;
@@ -550,33 +745,50 @@ export async function updateAnnouncement(
         "name email role",
       );
 
+    if (!announcement) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Announcement not found",
+      });
+    }
+
+    /* =====================================================
+       NEWLY PUBLISHED
+    ====================================================== */
+
     if (
       !wasPublished &&
       willBePublished
     ) {
+      const announcementId =
+        announcement._id.toString();
+
       await notifyAdmins({
         title:
           "Announcement Published",
-        message: `"${announcement!.title}" has been published.`,
-        type: "announcement",
+        message:
+          `"${announcement.title}" has been published.`,
+        type:
+          "announcement",
         link:
           "/dashboards/admin/announcements",
+        metadata: {
+          announcementId,
+        },
       });
 
-      /*
-       * Also notify finance users when the
-       * announcement's audience includes them.
-       */
-      const effectiveAudience = announcement!.audience;
+      await notifyFinanceIfNeeded(
+        announcement.audience,
+        announcement.title,
+        announcementId,
+      );
 
-      if (isVisibleToFinance(effectiveAudience)) {
-        await notifyByRole("finance", {
-          title: "New Announcement",
-          message: `"${announcement!.title}" has been published.`,
-          type: "announcement",
-          link: "/dashboards/finance/announcements",
-        });
-      }
+      await notifyLecturersIfNeeded(
+        announcement.audience,
+        announcement.title,
+        announcementId,
+      );
     }
 
     return res.status(200).json({
@@ -587,7 +799,8 @@ export async function updateAnnouncement(
     });
   } catch (error) {
     if (
-      error instanceof z.ZodError
+      error instanceof
+      z.ZodError
     ) {
       return res.status(400).json({
         success: false,
@@ -614,7 +827,6 @@ export async function updateAnnouncement(
 
 /* =========================================================
    PUBLISH ANNOUNCEMENT
-   ADMIN
 ========================================================= */
 
 export async function publishAnnouncement(
@@ -622,9 +834,13 @@ export async function publishAnnouncement(
   res: Response,
 ) {
   try {
-    const { id } = req.params;
+    const { id } =
+      req.params;
 
-    if (!objectId.safeParse(id).success) {
+    if (
+      !objectId.safeParse(id)
+        .success
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -633,7 +849,9 @@ export async function publishAnnouncement(
     }
 
     const announcement =
-      await Announcement.findById(id);
+      await Announcement.findById(
+        id,
+      );
 
     if (!announcement) {
       return res.status(404).json({
@@ -667,27 +885,46 @@ export async function publishAnnouncement(
       "name email role",
     );
 
+    const announcementId =
+      announcement._id.toString();
+
+    /* =====================================================
+       ADMIN
+    ====================================================== */
+
     await notifyAdmins({
       title:
         "Announcement Published",
-      message: `"${announcement.title}" has been published.`,
-      type: "announcement",
+      message:
+        `"${announcement.title}" has been published.`,
+      type:
+        "announcement",
       link:
         "/dashboards/admin/announcements",
+      metadata: {
+        announcementId,
+      },
     });
 
-    /*
-     * Also notify finance users when the
-     * announcement's audience includes them.
-     */
-    if (isVisibleToFinance(announcement.audience)) {
-      await notifyByRole("finance", {
-        title: "New Announcement",
-        message: `"${announcement.title}" has been published.`,
-        type: "announcement",
-        link: "/dashboards/finance/announcements",
-      });
-    }
+    /* =====================================================
+       FINANCE
+    ====================================================== */
+
+    await notifyFinanceIfNeeded(
+      announcement.audience,
+      announcement.title,
+      announcementId,
+    );
+
+    /* =====================================================
+       LECTURERS
+    ====================================================== */
+
+    await notifyLecturersIfNeeded(
+      announcement.audience,
+      announcement.title,
+      announcementId,
+    );
 
     return res.status(200).json({
       success: true,
@@ -711,7 +948,6 @@ export async function publishAnnouncement(
 
 /* =========================================================
    ARCHIVE ANNOUNCEMENT
-   ADMIN
 ========================================================= */
 
 export async function archiveAnnouncement(
@@ -719,9 +955,13 @@ export async function archiveAnnouncement(
   res: Response,
 ) {
   try {
-    const { id } = req.params;
+    const { id } =
+      req.params;
 
-    if (!objectId.safeParse(id).success) {
+    if (
+      !objectId.safeParse(id)
+        .success
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -733,7 +973,8 @@ export async function archiveAnnouncement(
       await Announcement.findByIdAndUpdate(
         id,
         {
-          status: "archived",
+          status:
+            "archived",
         },
         {
           new: true,
@@ -774,7 +1015,6 @@ export async function archiveAnnouncement(
 
 /* =========================================================
    DELETE ANNOUNCEMENT
-   ADMIN
 ========================================================= */
 
 export async function deleteAnnouncement(
@@ -782,9 +1022,13 @@ export async function deleteAnnouncement(
   res: Response,
 ) {
   try {
-    const { id } = req.params;
+    const { id } =
+      req.params;
 
-    if (!objectId.safeParse(id).success) {
+    if (
+      !objectId.safeParse(id)
+        .success
+    ) {
       return res.status(400).json({
         success: false,
         message:

@@ -10,6 +10,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { AdminDetailSkeleton } from "@/components/dashboard/admin/skeletons/admin-detail-skeleton";
 
 import {
   AlertCircle,
@@ -645,23 +646,7 @@ export default function AdminApplicationDetailsPage() {
     sessionStatus === "loading" ||
     loading
   ) {
-    return (
-      <div className="flex min-h-[520px] items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-navy/5">
-            <Loader2 className="h-6 w-6 animate-spin text-brand-navy" />
-          </div>
-
-          <p className="mt-5 text-sm font-semibold text-slate-900">
-            Loading application
-          </p>
-
-          <p className="mt-1 text-sm text-slate-500">
-            Please wait...
-          </p>
-        </div>
-      </div>
-    );
+    return <AdminDetailSkeleton />;
   }
 
   /*

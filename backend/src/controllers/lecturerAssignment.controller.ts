@@ -15,14 +15,25 @@ const assignSchema = z.object({
   semester: objectId,
 });
 
-// Admin/registrar assigns a lecturer to a course for a given semester
+// =========================================================
+// ADMIN / REGISTRAR
+// Assign lecturer to a course for a semester
+// =========================================================
 export async function assignLecturer(req: Request, res: Response) {
   try {
     const data = assignSchema.parse(req.body);
 
     const [lecturer, course] = await Promise.all([
-      User.findOne({ _id: data.lecturer, role: "lecturer", isActive: true }),
-      Course.findOne({ _id: data.course, isActive: true }),
+      User.findOne({
+        _id: data.lecturer,
+        role: "lecturer",
+        isActive: true,
+      }),
+
+      Course.findOne({
+        _id: data.course,
+        isActive: true,
+      }),
     ]);
 
     if (!lecturer) {
@@ -72,7 +83,8 @@ export async function assignLecturer(req: Request, res: Response) {
     if ((error as { code?: number }).code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "This lecturer is already assigned to this course for this semester",
+        message:
+          "This lecturer is already assigned to this course for this semester",
       });
     }
 
@@ -85,47 +97,29 @@ export async function assignLecturer(req: Request, res: Response) {
   }
 }
 
-// Admin/registrar views all assignments, optionally filtered
+// =========================================================
+// ADMIN / REGISTRAR
+// View all lecturer assignments
+// =========================================================
 export async function getAssignments(req: Request, res: Response) {
   try {
     const semester =
-      typeof req.query.semester === "string" ? req.query.semester : undefined;
+      typeof req.query.semester === "string"
+        ? req.query.semester
+        : undefined;
+
     const course =
-      typeof req.query.course === "string" ? req.query.course : undefined;
+      typeof req.query.course === "string"
+        ? req.query.course
+        : undefined;
 
     const assignments = await LecturerAssignment.find({
       isActive: true,
+
       ...(semester ? { semester } : {}),
       ...(course ? { course } : {}),
     })
       .populate("lecturer", "name email")
-      .populate("course", "code title creditUnits")
-      .populate("semester", "name order")
-      .sort({ createdAt: -1 });
-
-    return res.status(200).json({
-      success: true,
-      assignments,
-    });
-  } catch {
-    return res.status(500).json({
-      success: false,
-      message: "Unable to retrieve assignments",
-    });
-  }
-}
-
-// Lecturer views their own assigned courses
-export async function getMyAssignments(req: AuthRequest, res: Response) {
-  try {
-    const semester =
-      typeof req.query.semester === "string" ? req.query.semester : undefined;
-
-    const assignments = await LecturerAssignment.find({
-      lecturer: req.user!.userId,
-      isActive: true,
-      ...(semester ? { semester } : {}),
-    })
       .populate("course", "code title creditUnits level")
       .populate("semester", "name order")
       .sort({ createdAt: -1 });
@@ -134,7 +128,9 @@ export async function getMyAssignments(req: AuthRequest, res: Response) {
       success: true,
       assignments,
     });
-  } catch {
+  } catch (error) {
+    console.error("Get assignments error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Unable to retrieve assignments",
@@ -142,23 +138,86 @@ export async function getMyAssignments(req: AuthRequest, res: Response) {
   }
 }
 
-// Admin/registrar removes a lecturer assignment
-export async function removeAssignment(req: Request, res: Response) {
-  const assignment = await LecturerAssignment.findByIdAndUpdate(
-    req.params.id,
-    { isActive: false },
-    { new: true },
-  );
+// =========================================================
+// LECTURER
+// View only the authenticated lecturer's assignments
+// =========================================================
+export async function getMyAssignments(
+  req: AuthRequest,
+  res: Response,
+) {
+  try {
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
 
-  if (!assignment) {
-    return res.status(404).json({
+    const semester =
+      typeof req.query.semester === "string"
+        ? req.query.semester
+        : undefined;
+
+    const assignments = await LecturerAssignment.find({
+      lecturer: req.user.userId,
+      isActive: true,
+
+      ...(semester ? { semester } : {}),
+    })
+      .populate(
+        "course",
+        "code title creditUnits level semester programme department",
+      )
+      .populate("semester", "name order")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      assignments,
+    });
+  } catch (error) {
+    console.error("Get my lecturer assignments error:", error);
+
+    return res.status(500).json({
       success: false,
-      message: "Assignment not found",
+      message: "Unable to retrieve your assignments",
     });
   }
+}
 
-  return res.status(200).json({
-    success: true,
-    message: "Assignment removed successfully",
-  });
+// =========================================================
+// ADMIN / REGISTRAR
+// Remove lecturer assignment
+// =========================================================
+export async function removeAssignment(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const assignment = await LecturerAssignment.findByIdAndUpdate(
+      req.params.id,
+      { isActive: false },
+      { new: true },
+    );
+
+    if (!assignment) {
+      return res.status(404).json({
+        success: false,
+        message: "Assignment not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Assignment removed successfully",
+    });
+  } catch (error) {
+    console.error("Remove assignment error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to remove assignment",
+    });
+  }
 }

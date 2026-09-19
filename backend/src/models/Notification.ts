@@ -22,11 +22,10 @@ export type NotificationType =
   | "system";
 
 /* =========================================================
-   NOTIFICATION DOCUMENT
+   DOCUMENT
 ========================================================= */
 
-export interface INotification
-  extends Document {
+export interface INotification extends Document {
   recipient: Types.ObjectId;
 
   title: string;
@@ -38,10 +37,7 @@ export interface INotification
 
   link?: string;
 
-  metadata?: Record<
-    string,
-    unknown
-  >;
+  metadata?: Record<string, unknown>;
 
   createdAt: Date;
   updatedAt: Date;
@@ -51,111 +47,117 @@ export interface INotification
    SCHEMA
 ========================================================= */
 
-const notificationSchema =
-  new Schema<INotification>(
-    {
-      /* =====================================================
-         RECIPIENT
-      ====================================================== */
+const notificationSchema = new Schema<INotification>(
+  {
+    /* -------------------------------------------------------
+       RECIPIENT
+    ------------------------------------------------------- */
 
-      recipient: {
-        type: Schema.Types.ObjectId,
-        ref: "User",
-        required: true,
-        index: true,
-      },
-
-      /* =====================================================
-         TITLE
-      ====================================================== */
-
-      title: {
-        type: String,
-        required: true,
-        trim: true,
-        maxlength: 200,
-      },
-
-      /* =====================================================
-         MESSAGE
-      ====================================================== */
-
-      message: {
-        type: String,
-        required: true,
-        trim: true,
-        maxlength: 1000,
-      },
-
-      /* =====================================================
-         TYPE
-      ====================================================== */
-
-      type: {
-        type: String,
-
-        enum: [
-          "info",
-          "success",
-          "warning",
-          "error",
-          "admission",
-          "result",
-          "course",
-          "registration",
-          "user",
-          "announcement",
-          "system",
-        ],
-
-        default: "info",
-
-        required: true,
-      },
-
-      /* =====================================================
-         READ STATUS
-      ====================================================== */
-
-      isRead: {
-        type: Boolean,
-        default: false,
-        required: true,
-        index: true,
-      },
-
-      /* =====================================================
-         OPTIONAL LINK
-      ====================================================== */
-
-      link: {
-        type: String,
-        trim: true,
-        maxlength: 500,
-      },
-
-      /* =====================================================
-         OPTIONAL METADATA
-      ====================================================== */
-
-      metadata: {
-        type: Schema.Types.Mixed,
-      },
+    recipient: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
     },
-    {
-      timestamps: true,
+
+    /* -------------------------------------------------------
+       TITLE
+    ------------------------------------------------------- */
+
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 200,
     },
-  );
+
+    /* -------------------------------------------------------
+       MESSAGE
+    ------------------------------------------------------- */
+
+    message: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 1000,
+    },
+
+    /* -------------------------------------------------------
+       NOTIFICATION TYPE
+    ------------------------------------------------------- */
+
+    type: {
+      type: String,
+      enum: [
+        "info",
+        "success",
+        "warning",
+        "error",
+        "admission",
+        "result",
+        "course",
+        "registration",
+        "user",
+        "announcement",
+        "system",
+      ],
+      required: true,
+      default: "info",
+    },
+
+    /* -------------------------------------------------------
+       READ STATUS
+    ------------------------------------------------------- */
+
+    isRead: {
+      type: Boolean,
+      required: true,
+      default: false,
+      index: true,
+    },
+
+    /* -------------------------------------------------------
+       OPTIONAL NAVIGATION LINK
+    ------------------------------------------------------- */
+
+    link: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+    },
+
+    /* -------------------------------------------------------
+       OPTIONAL METADATA
+    ------------------------------------------------------- */
+
+    metadata: {
+      type: Schema.Types.Mixed,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
 
 /* =========================================================
-   INDEX
+   INDEXES
 ========================================================= */
 
+/*
+ * Used when loading a user's notifications:
+ *
+ * recipient + newest first
+ */
 notificationSchema.index({
   recipient: 1,
   createdAt: -1,
 });
 
+/*
+ * Used by the notification bell counter:
+ *
+ * recipient + unread notifications
+ */
 notificationSchema.index({
   recipient: 1,
   isRead: 1,

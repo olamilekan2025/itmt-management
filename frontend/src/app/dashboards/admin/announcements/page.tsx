@@ -25,6 +25,7 @@ import {
 
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
+import { AdminTableSkeleton } from "@/components/dashboard/admin/skeletons/admin-table-skeleton";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -685,14 +686,7 @@ export default function AdminAnnouncementsPage() {
       !accessToken &&
       loading)
   ) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm text-slate-500 shadow-sm">
-          <Loader2 className="h-5 w-5 animate-spin text-brand-navy" />
-          Loading announcements...
-        </div>
-      </div>
-    );
+    return <AdminTableSkeleton />;
   }
 
   /* =========================================================

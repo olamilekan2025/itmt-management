@@ -26,6 +26,7 @@ import {
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 
+import { AdminTableSkeleton } from "@/components/dashboard/admin/skeletons/admin-table-skeleton";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -689,9 +690,7 @@ export default function AdminAcademicReportsPage() {
   ======================================================= */
 
   if (sessionStatus === "loading") {
-    return (
-      <LoadingState message="Checking your session..." />
-    );
+    return <LoadingState />;
   }
 
   /* =======================================================
@@ -730,9 +729,7 @@ export default function AdminAcademicReportsPage() {
   ======================================================= */
 
   if (initialLoading && !report) {
-    return (
-      <LoadingState message="Generating academic report..." />
-    );
+    return <LoadingState />;
   }
 
   /* =======================================================
@@ -1714,24 +1711,8 @@ export default function AdminAcademicReportsPage() {
    LOADING STATE
 ========================================================= */
 
-function LoadingState({
-  message,
-}: {
-  message: string;
-}) {
-  return (
-    <div className="flex min-h-[500px] items-center justify-center px-4">
-      <div className="flex flex-col items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-navy/10">
-          <Loader2 className="h-6 w-6 animate-spin text-brand-navy" />
-        </div>
-
-        <p className="text-sm text-slate-500">
-          {message}
-        </p>
-      </div>
-    </div>
-  );
+function LoadingState() {
+  return <AdminTableSkeleton />;
 }
 
 /* =========================================================

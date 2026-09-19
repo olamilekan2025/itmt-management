@@ -10,7 +10,6 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   GraduationCap,
-  Loader2,
   Plus,
   RefreshCw,
   Search,
@@ -32,6 +31,7 @@ import {
 } from "@/components/ui/card";
 
 import { apiGet } from "@/lib/api";
+import { AdminTableSkeleton } from "@/components/dashboard/admin/skeletons/admin-table-skeleton";
 
 /* =========================================================
    TYPES
@@ -296,25 +296,7 @@ export default function AdminStudentsPage() {
     status === "loading" ||
     loading
   ) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-navy/10">
-            <Loader2 className="h-6 w-6 animate-spin text-brand-navy" />
-          </div>
-
-          <div className="text-center">
-            <p className="text-sm font-semibold text-brand-dark">
-              Loading students
-            </p>
-
-            <p className="mt-1 text-xs text-slate-500">
-              Retrieving student directory...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return <AdminTableSkeleton />;
   }
 
   /* =========================================================

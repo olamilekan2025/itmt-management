@@ -17,7 +17,10 @@ import {
   X,
 } from "lucide-react";
 
+import { AdminTableSkeleton } from "@/components/dashboard/admin/skeletons/admin-table-skeleton";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 
 interface Slide {
   _id: string;

@@ -25,6 +25,7 @@ import { useSession } from "next-auth/react";
 
 import { apiGet } from "@/lib/api";
 
+import { AdminTableSkeleton } from "@/components/dashboard/admin/skeletons/admin-table-skeleton";
 /*
  * =========================================================
  * TYPES
@@ -1379,29 +1380,7 @@ function Pagination({
  */
 
 function PageLoader() {
-  return (
-    <div className="flex min-h-[520px] items-center justify-center">
-
-      <div className="text-center">
-
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-navy/5">
-
-          <Loader2 className="h-6 w-6 animate-spin text-brand-navy" />
-
-        </div>
-
-        <p className="mt-5 text-sm font-bold text-slate-900">
-          Loading applications
-        </p>
-
-        <p className="mt-1 text-sm text-slate-400">
-          Preparing your admissions workspace...
-        </p>
-
-      </div>
-
-    </div>
-  );
+  return <AdminTableSkeleton />;
 }
 
 /*
@@ -1411,40 +1390,7 @@ function PageLoader() {
  */
 
 function TableLoader() {
-  return (
-    <div className="divide-y divide-slate-100">
-
-      {Array.from({
-        length: 6,
-      }).map((_, index) => (
-        <div
-          key={index}
-          className="flex animate-pulse items-center gap-5 px-6 py-5"
-        >
-
-          <div className="h-11 w-11 shrink-0 rounded-xl bg-slate-100" />
-
-          <div className="flex-1 space-y-2">
-
-            <div className="h-3 w-40 rounded bg-slate-100" />
-
-            <div className="h-2.5 w-28 rounded bg-slate-100" />
-
-          </div>
-
-          <div className="hidden h-3 w-32 rounded bg-slate-100 lg:block" />
-
-          <div className="hidden h-3 w-24 rounded bg-slate-100 xl:block" />
-
-          <div className="h-7 w-20 rounded-full bg-slate-100" />
-
-          <div className="hidden h-9 w-16 rounded-xl bg-slate-100 lg:block" />
-
-        </div>
-      ))}
-
-    </div>
-  );
+  return <AdminTableSkeleton />;
 }
 
 /*

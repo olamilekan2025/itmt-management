@@ -16,24 +16,36 @@ import {
 const router = Router();
 
 /* =========================================================
+   AUTHORIZED NOTIFICATION ROLES
+========================================================= */
+
+const notificationRoles = [
+  "admin",
+  "finance",
+  "registrar",
+  "lecturer",
+] as const;
+
+/* =========================================================
    GET MY NOTIFICATIONS
 ========================================================= */
 
 router.get(
   "/",
   authenticate,
-  authorize("admin", "finance", "registrar"),
+  authorize(...notificationRoles),
   getMyNotifications,
 );
 
 /* =========================================================
-   GET UNREAD COUNT
+   GET UNREAD NOTIFICATION COUNT
+   Used by dashboard notification bells
 ========================================================= */
 
 router.get(
   "/unread-count",
   authenticate,
-  authorize("admin", "finance", "registrar"),
+  authorize(...notificationRoles),
   getUnreadNotificationCount,
 );
 
@@ -44,7 +56,7 @@ router.get(
 router.patch(
   "/read-all",
   authenticate,
-  authorize("admin", "finance", "registrar"),
+  authorize(...notificationRoles),
   markAllNotificationsAsRead,
 );
 
@@ -55,18 +67,18 @@ router.patch(
 router.patch(
   "/:id/read",
   authenticate,
-  authorize("admin", "finance", "registrar"),
+  authorize(...notificationRoles),
   markNotificationAsRead,
 );
 
 /* =========================================================
-   DELETE
+   DELETE ONE NOTIFICATION
 ========================================================= */
 
 router.delete(
   "/:id",
   authenticate,
-  authorize("admin", "finance", "registrar"),
+  authorize(...notificationRoles),
   deleteNotification,
 );
 

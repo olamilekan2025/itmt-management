@@ -1,3 +1,133 @@
+// import mongoose, {
+//   Document,
+//   Schema,
+//   Types,
+// } from "mongoose";
+
+// /* =========================================================
+//    TYPES
+// ========================================================= */
+
+// export type AnnouncementAudience =
+//   | "everyone"
+//   | "students"
+//   | "lecturers"
+//   | "staff"
+//   | "finance";
+
+// export type AnnouncementStatus =
+//   | "draft"
+//   | "published"
+//   | "archived";
+
+// /* =========================================================
+//    DOCUMENT
+// ========================================================= */
+
+// export interface IAnnouncement extends Document {
+//   title: string;
+//   content: string;
+
+//   audience: AnnouncementAudience;
+//   status: AnnouncementStatus;
+
+//   createdBy: Types.ObjectId;
+
+//   publishedAt?: Date;
+//   createdAt: Date;
+//   updatedAt: Date;
+// }
+
+// /* =========================================================
+//    SCHEMA
+// ========================================================= */
+
+// const announcementSchema =
+//   new Schema<IAnnouncement>(
+//     {
+//       title: {
+//         type: String,
+//         required: true,
+//         trim: true,
+//         maxlength: 200,
+//       },
+
+//       content: {
+//         type: String,
+//         required: true,
+//         trim: true,
+//         maxlength: 10000,
+//       },
+
+//       audience: {
+//         type: String,
+//         enum: [
+//           "everyone",
+//           "students",
+//           "lecturers",
+//           "staff",
+//           "finance",
+//         ],
+//         default: "everyone",
+//         required: true,
+//       },
+
+//       status: {
+//         type: String,
+//         enum: [
+//           "draft",
+//           "published",
+//           "archived",
+//         ],
+//         default: "draft",
+//         required: true,
+//       },
+
+//       createdBy: {
+//         type: Schema.Types.ObjectId,
+//         ref: "User",
+//         required: true,
+//       },
+
+//       publishedAt: {
+//         type: Date,
+//       },
+//     },
+//     {
+//       timestamps: true,
+//     },
+//   );
+
+// /* =========================================================
+//    INDEXES
+// ========================================================= */
+
+// announcementSchema.index({
+//   status: 1,
+//   audience: 1,
+//   createdAt: -1,
+// });
+
+// announcementSchema.index({
+//   createdAt: -1,
+// });
+
+// /* =========================================================
+//    MODEL
+// ========================================================= */
+
+// const Announcement =
+//   mongoose.models.Announcement ||
+//   mongoose.model<IAnnouncement>(
+//     "Announcement",
+//     announcementSchema,
+//   );
+
+// export default Announcement;
+
+
+
+
 import mongoose, {
   Document,
   Schema,
@@ -24,7 +154,8 @@ export type AnnouncementStatus =
    DOCUMENT
 ========================================================= */
 
-export interface IAnnouncement extends Document {
+export interface IAnnouncement
+  extends Document {
   title: string;
   content: string;
 
@@ -34,6 +165,7 @@ export interface IAnnouncement extends Document {
   createdBy: Types.ObjectId;
 
   publishedAt?: Date;
+
   createdAt: Date;
   updatedAt: Date;
 }

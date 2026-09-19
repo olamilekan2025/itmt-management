@@ -18,11 +18,24 @@ import {
 const router = Router();
 
 /* =========================================================
-   ADMIN / REGISTRAR / FINANCE
-   GET ALL ANNOUNCEMENTS
+   READ ANNOUNCEMENTS
 
-   Finance receives a restricted response from the controller:
-   published + everyone/staff/finance only.
+   Admin:
+   - Full access
+
+   Registrar:
+   - Full read access
+
+   Finance:
+   - Published:
+     everyone
+     staff
+     finance
+
+   Lecturer:
+   - Published:
+     everyone
+     lecturers
 ========================================================= */
 
 router.get(
@@ -32,16 +45,10 @@ router.get(
     "admin",
     "registrar",
     "finance",
+    "lecturer",
   ),
   getAllAnnouncements,
 );
-
-/* =========================================================
-   ADMIN / REGISTRAR / FINANCE
-   GET SINGLE ANNOUNCEMENT
-
-   Finance access is restricted inside the controller.
-========================================================= */
 
 router.get(
   "/:id",
@@ -50,13 +57,14 @@ router.get(
     "admin",
     "registrar",
     "finance",
+    "lecturer",
   ),
   getAnnouncementById,
 );
 
 /* =========================================================
-   ADMIN
-   CREATE ANNOUNCEMENT
+   CREATE
+   ADMIN ONLY
 ========================================================= */
 
 router.post(
@@ -67,8 +75,8 @@ router.post(
 );
 
 /* =========================================================
-   ADMIN
-   UPDATE ANNOUNCEMENT
+   UPDATE
+   ADMIN ONLY
 ========================================================= */
 
 router.patch(
@@ -79,8 +87,8 @@ router.patch(
 );
 
 /* =========================================================
-   ADMIN
-   PUBLISH ANNOUNCEMENT
+   PUBLISH
+   ADMIN ONLY
 ========================================================= */
 
 router.patch(
@@ -91,8 +99,8 @@ router.patch(
 );
 
 /* =========================================================
-   ADMIN
-   ARCHIVE ANNOUNCEMENT
+   ARCHIVE
+   ADMIN ONLY
 ========================================================= */
 
 router.patch(
@@ -103,8 +111,8 @@ router.patch(
 );
 
 /* =========================================================
-   ADMIN
-   DELETE ANNOUNCEMENT
+   DELETE
+   ADMIN ONLY
 ========================================================= */
 
 router.delete(

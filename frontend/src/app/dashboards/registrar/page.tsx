@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
+import RegistrarDashboardSkeleton from "@/components/dashboard/registrar/registrar-dashboard-skeleton";
 
 import {
   Activity,
@@ -239,23 +240,7 @@ export default function RegistrarDashboardPage() {
   }, [sessionStatus, loadDashboard]);
 
   if (sessionStatus === "loading" || loading) {
-    return (
-      <div className="flex min-h-[65vh] items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-navy shadow-xl shadow-brand-navy/20">
-            <Loader2 className="h-6 w-6 animate-spin text-brand-gold" />
-          </div>
-
-          <p className="mt-5 text-sm font-semibold text-slate-800">
-            Loading registrar workspace
-          </p>
-
-          <p className="mt-1 text-xs text-slate-500">
-            Preparing your dashboard...
-          </p>
-        </div>
-      </div>
-    );
+    return <RegistrarDashboardSkeleton />;
   }
 
   if (error && !stats) {

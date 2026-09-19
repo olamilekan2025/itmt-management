@@ -6,10 +6,18 @@ import {
   getMyAssignments,
   removeAssignment,
 } from "../controllers/lecturerAssignment.controller.js";
-import { authenticate, authorize } from "../middleware/auth.middleware.js";
+
+import {
+  authenticate,
+  authorize,
+} from "../middleware/auth.middleware.js";
 
 const router = Router();
 
+// =========================================================
+// ADMIN / REGISTRAR
+// Assign lecturer
+// =========================================================
 router.post(
   "/",
   authenticate,
@@ -17,6 +25,10 @@ router.post(
   assignLecturer,
 );
 
+// =========================================================
+// ADMIN / REGISTRAR
+// View all assignments
+// =========================================================
 router.get(
   "/",
   authenticate,
@@ -24,6 +36,10 @@ router.get(
   getAssignments,
 );
 
+// =========================================================
+// LECTURER
+// View own assignments
+// =========================================================
 router.get(
   "/me",
   authenticate,
@@ -31,6 +47,10 @@ router.get(
   getMyAssignments,
 );
 
+// =========================================================
+// ADMIN / REGISTRAR
+// Remove assignment
+// =========================================================
 router.patch(
   "/:id/remove",
   authenticate,

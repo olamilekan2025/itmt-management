@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSession } from "next-auth/react";
 import Link from "next/link";
 import { apiGet } from "@/lib/api";
+import FinanceDashboardSkeleton from "@/components/dashboard/finance/finance-dashboard-skeleton";
 
 import {
   Card,
@@ -404,6 +405,10 @@ export default function FinanceDashboard() {
   /* =======================================================
      RENDER
   ======================================================= */
+
+  if (loading) {
+    return <FinanceDashboardSkeleton />;
+  }
 
   return (
     <div className="mx-auto w-full space-y-6">

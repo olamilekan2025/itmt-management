@@ -12,26 +12,64 @@ export type UserRole =
   | "student";
 
 export interface IUser extends Document {
+  /* =====================================================
+     BASIC INFORMATION
+  ===================================================== */
+
   name: string;
   email: string;
   password?: string;
 
+  phone?: string;
+  profileImage?: string;
+
+  /* =====================================================
+     ROLE
+  ===================================================== */
+
   role: UserRole;
+
+  /* =====================================================
+     STAFF INFORMATION
+  ===================================================== */
+
+  staffNumber?: string;
+  qualification?: string;
+
+  /* =====================================================
+     STUDENT ACADEMIC INFORMATION
+  ===================================================== */
 
   programme?: Types.ObjectId;
   academicSession?: Types.ObjectId;
   matricNumber?: string;
   level?: string;
 
+  /* =====================================================
+     ACCOUNT STATUS
+  ===================================================== */
+
   isActive: boolean;
   isSuspended: boolean;
   isEmailVerified: boolean;
 
+  /* =====================================================
+     EMAIL VERIFICATION
+  ===================================================== */
+
   emailVerificationTokenHash?: string;
   emailVerificationExpires?: Date;
 
+  /* =====================================================
+     OTP
+  ===================================================== */
+
   otpHash?: string;
   otpExpires?: Date;
+
+  /* =====================================================
+     PASSWORD RESET
+  ===================================================== */
 
   passwordResetTokenHash?: string;
   passwordResetExpires?: Date;
@@ -50,6 +88,7 @@ const userSchema = new Schema<IUser>(
       type: String,
       required: true,
       trim: true,
+      maxlength: 100,
     },
 
     email: {
@@ -63,6 +102,18 @@ const userSchema = new Schema<IUser>(
     password: {
       type: String,
       select: false,
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+      maxlength: 30,
+    },
+
+    profileImage: {
+      type: String,
+      trim: true,
+      maxlength: 500,
     },
 
     /* =====================================================
@@ -80,6 +131,25 @@ const userSchema = new Schema<IUser>(
       ],
       default: "student",
       required: true,
+    },
+
+    /* =====================================================
+       STAFF INFORMATION
+    ===================================================== */
+
+    staffNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      maxlength: 50,
+      sparse: true,
+      unique: true,
+    },
+
+    qualification: {
+      type: String,
+      trim: true,
+      maxlength: 150,
     },
 
     /* =====================================================

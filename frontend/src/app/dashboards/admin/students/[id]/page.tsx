@@ -27,6 +27,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+import { AdminDetailSkeleton } from "@/components/dashboard/admin/skeletons/admin-detail-skeleton";
 import {
   AlertDialog,
   AlertDialogAction,

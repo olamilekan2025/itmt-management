@@ -30,8 +30,9 @@ import {
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 
-import { apiPatch } from "@/lib/api";
+import { apiPatch, ApiError } from "@/lib/api";
 
 /* =========================================================
    TYPES
@@ -70,6 +71,59 @@ const INITIAL_PASSWORD_FORM: PasswordForm = {
   newPassword: "",
   confirmPassword: "",
 };
+
+/* =========================================================
+   ERROR MESSAGE HELPER
+   ---------------------------------------------------------
+   The backend returns Zod field errors as:
+     { success: false, message: "Validation failed",
+       errors: { fieldName: ["reason 1", "reason 2"] } }
+
+   apiFetch already captures that full body into
+   ApiError.data. Previously the UI only ever read
+   error.message, so every validation failure just showed
+   the generic "Validation failed" string. This pulls the
+   first real field-level reason out when one exists.
+========================================================= */
+
+function extractApiErrorMessage(
+  error: unknown,
+  fallback: string,
+): string {
+  if (error instanceof ApiError) {
+    const data = error.data;
+
+    if (
+      typeof data === "object" &&
+      data !== null &&
+      "errors" in data &&
+      typeof (data as { errors?: unknown }).errors === "object" &&
+      (data as { errors?: unknown }).errors !== null
+    ) {
+      const fieldErrors = (
+        data as { errors: Record<string, string[] | undefined> }
+      ).errors;
+
+      for (const key of Object.keys(fieldErrors)) {
+        const messages = fieldErrors[key];
+
+        if (messages && messages.length > 0) {
+          return messages[0];
+        }
+      }
+    }
+
+    if (error.message.trim()) {
+      return error.message;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
+}
 
 /* =========================================================
    PAGE
@@ -168,6 +222,7 @@ export default function RegistrarSettingsPage() {
       );
 
       setSaved(true);
+      toast.success("Preferences saved.");
 
       window.setTimeout(() => {
         setSaved(false);
@@ -177,6 +232,7 @@ export default function RegistrarSettingsPage() {
         "Unable to save registrar preferences:",
         error,
       );
+      toast.error("Unable to save preferences. Please try again.");
     }
   }
 
@@ -326,13 +382,15 @@ export default function RegistrarSettingsPage() {
 
     if (validationError) {
       setPasswordError(validationError);
+      toast.error(validationError);
       return;
     }
 
     if (!session?.accessToken) {
-      setPasswordError(
-        "Authentication token is unavailable. Please sign in again.",
-      );
+      const message =
+        "Authentication token is unavailable. Please sign in again.";
+      setPasswordError(message);
+      toast.error(message);
       return;
     }
 
@@ -345,6 +403,16 @@ export default function RegistrarSettingsPage() {
        *
        * The authenticated user's identity comes from
        * the backend JWT. We do not send a user ID.
+       *
+       * IMPORTANT: the backend's changePasswordSchema
+       * requires currentPassword, newPassword, AND
+       * confirmPassword (it re-validates the match
+       * server-side via .refine()). Omitting
+       * confirmPassword here was the cause of the
+       * previous "Validation failed" 400 on every
+       * submission — Zod rejected the missing required
+       * field before the request ever reached the
+       * bcrypt.compare() logic.
        */
       await apiPatch(
         "/users/me/password",
@@ -353,13 +421,17 @@ export default function RegistrarSettingsPage() {
             passwordForm.currentPassword,
           newPassword:
             passwordForm.newPassword,
+          confirmPassword:
+            passwordForm.confirmPassword,
         },
         session.accessToken,
       );
 
-      setPasswordSuccess(
-        "Your password has been changed successfully.",
-      );
+      const successMessage =
+        "Your password has been changed successfully.";
+
+      setPasswordSuccess(successMessage);
+      toast.success(successMessage);
 
       setPasswordForm(
         INITIAL_PASSWORD_FORM,
@@ -370,16 +442,13 @@ export default function RegistrarSettingsPage() {
         error,
       );
 
-      let message =
-        "Unable to change your password. Please try again.";
-
-      if (error instanceof Error) {
-        if (error.message.trim()) {
-          message = error.message;
-        }
-      }
+      const message = extractApiErrorMessage(
+        error,
+        "Unable to change your password. Please try again.",
+      );
 
       setPasswordError(message);
+      toast.error(message);
     } finally {
       setChangingPassword(false);
     }

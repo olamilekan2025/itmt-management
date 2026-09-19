@@ -1,12 +1,17 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 
+import type { AuthRequest } from "../middleware/auth.middleware.js";
+
 import Result from "../models/Result.js";
 import User from "../models/User.js";
 import Course from "../models/Course.js";
 import Programme from "../models/Programme.js";
 import Semester from "../models/Semester.js";
 import AcademicSession from "../models/AcademicSession.js";
+import Attendance from "../models/attendance.model.js";
+import LecturerAssignment from "../models/LecturerAssignment.js";
+import Registration from "../models/Registration.js";
 
 /* =========================================================
    VALIDATION
@@ -30,6 +35,332 @@ const reportQuerySchema = z.object({
 function round(value: number, decimals = 2) {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
+}
+
+/* =========================================================
+   LECTURER ACADEMIC REPORT
+========================================================= */
+
+export async function getLecturerAcademicReport(
+  req: AuthRequest,
+  res: Response,
+) {
+  try {
+    const lecturerId = req.user!.userId;
+
+    const course =
+      typeof req.query.course === "string"
+        ? req.query.course
+        : undefined;
+
+    const semester =
+      typeof req.query.semester === "string"
+        ? req.query.semester
+        : undefined;
+
+    if (!course || !semester) {
+      return res.status(400).json({
+        success: false,
+        message: "course and semester query parameters are required",
+      });
+    }
+
+    if (
+      !objectId.safeParse(course).success ||
+      !objectId.safeParse(semester).success
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid course or semester ID",
+      });
+    }
+
+    /* =====================================================
+       VERIFY LECTURER ASSIGNMENT
+    ====================================================== */
+
+    const assignment =
+      await LecturerAssignment.findOne({
+        lecturer: lecturerId,
+        course,
+        semester,
+        isActive: true,
+      });
+
+    if (!assignment) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this course for this semester",
+      });
+    }
+
+    /* =====================================================
+       GET COURSE AND SEMESTER DETAILS
+    ====================================================== */
+
+    const [courseDetails, semesterDetails] =
+      await Promise.all([
+        Course.findById(course).select(
+          "code title creditUnits level programme",
+        ),
+        Semester.findById(semester).select(
+          "name order session",
+        ),
+      ]);
+
+    if (!courseDetails || !semesterDetails) {
+      return res.status(404).json({
+        success: false,
+        message: "Course or semester not found",
+      });
+    }
+
+    /* =====================================================
+       GET REGISTERED STUDENTS
+    ====================================================== */
+
+    const registrations =
+      await Registration.find({
+        course,
+        semester,
+        status: "registered",
+      })
+        .populate(
+          "student",
+          "name email matricNumber level programme",
+        )
+        .sort({ createdAt: 1 });
+
+    const studentIds = registrations.map(
+      (reg) => reg.student._id,
+    );
+
+    /* =====================================================
+       GET ATTENDANCE RECORDS
+    ====================================================== */
+
+    const attendanceRecords =
+      await Attendance.find({
+        course,
+        semester,
+        student: { $in: studentIds },
+      }).sort({ date: 1 });
+
+    /* =====================================================
+       GET RESULTS
+    ====================================================== */
+
+    const results = await Result.find({
+      course,
+      semester,
+      student: { $in: studentIds },
+    })
+      .populate("student", "name email matricNumber level")
+      .sort({ score: -1 });
+
+    /* =====================================================
+       CALCULATE ATTENDANCE STATISTICS
+    ====================================================== */
+
+    const attendanceStats = {
+      totalSessions: 0,
+      totalRecords: attendanceRecords.length,
+      present: 0,
+      absent: 0,
+      late: 0,
+      excused: 0,
+    };
+
+    // Get unique dates to count total sessions
+    const uniqueDates = new Set(
+      attendanceRecords.map((att) =>
+        att.date.toISOString().split("T")[0],
+      ),
+    );
+    attendanceStats.totalSessions = uniqueDates.size;
+
+    // Count each status
+    for (const record of attendanceRecords) {
+      if (record.status === "present") {
+        attendanceStats.present++;
+      } else if (record.status === "absent") {
+        attendanceStats.absent++;
+      } else if (record.status === "late") {
+        attendanceStats.late++;
+      } else if (record.status === "excused") {
+        attendanceStats.excused++;
+      }
+    }
+
+    /* =====================================================
+       CALCULATE RESULT STATISTICS
+    ====================================================== */
+
+    const resultStats = {
+      total: results.length,
+      submitted: results.length,
+      pending: registrations.length - results.length,
+      averageScore: 0,
+      highestScore: 0,
+      lowestScore: 100,
+    };
+
+    if (results.length > 0) {
+      const scores = results.map((r) => r.score);
+      resultStats.averageScore =
+        scores.reduce((a, b) => a + b, 0) /
+        scores.length;
+      resultStats.highestScore = Math.max(...scores);
+      resultStats.lowestScore = Math.min(...scores);
+    }
+
+    /* =====================================================
+       GRADE DISTRIBUTION
+    ====================================================== */
+
+    const gradeDistribution = {
+      A: 0,
+      B: 0,
+      C: 0,
+      D: 0,
+      E: 0,
+      F: 0,
+    };
+
+    for (const result of results) {
+      if (result.grade in gradeDistribution) {
+        gradeDistribution[result.grade as keyof typeof gradeDistribution]++;
+      }
+    }
+
+    /* =====================================================
+       BUILD STUDENT PERFORMANCE DATA
+    ====================================================== */
+
+    const studentPerformance = registrations.map(
+      (registration) => {
+        const student =
+          registration.student as any;
+
+        const studentId = student._id.toString();
+
+        // Calculate attendance for this student
+        const studentAttendance =
+          attendanceRecords.filter(
+            (att) =>
+              att.student.toString() === studentId,
+          );
+
+        const attendanceStats = {
+          present: 0,
+          absent: 0,
+          late: 0,
+          excused: 0,
+          totalRecords: studentAttendance.length,
+          percentage: 0,
+        };
+
+        for (const att of studentAttendance) {
+          if (att.status === "present") {
+            attendanceStats.present++;
+          } else if (att.status === "absent") {
+            attendanceStats.absent++;
+          } else if (att.status === "late") {
+            attendanceStats.late++;
+          } else if (att.status === "excused") {
+            attendanceStats.excused++;
+          }
+        }
+
+        if (attendanceStats.totalRecords > 0) {
+          attendanceStats.percentage =
+            (attendanceStats.present /
+              attendanceStats.totalRecords) *
+            100;
+        }
+
+        // Get result for this student
+        const studentResult = results.find(
+          (r) =>
+            r.student._id.toString() === studentId,
+        );
+
+        return {
+          student: {
+            _id: student._id,
+            name: student.name,
+            matricNumber: student.matricNumber,
+            level: student.level,
+          },
+          attendance: attendanceStats,
+          result: studentResult
+            ? {
+                score: studentResult.score,
+                grade: studentResult.grade,
+                status: studentResult.status,
+              }
+            : null,
+        };
+      },
+    );
+
+    /* =====================================================
+       CALCULATE ATTENDANCE RATE
+    ====================================================== */
+
+    const attendanceRate =
+      attendanceStats.totalRecords > 0
+        ? (attendanceStats.present /
+            attendanceStats.totalRecords) *
+          100
+        : 0;
+
+    /* =====================================================
+       RESPONSE
+    ====================================================== */
+
+    return res.status(200).json({
+      success: true,
+      course: {
+        _id: courseDetails._id,
+        code: courseDetails.code,
+        title: courseDetails.title,
+        creditUnits: courseDetails.creditUnits,
+        level: courseDetails.level,
+      },
+      semester: {
+        _id: semesterDetails._id,
+        name: semesterDetails.name,
+        order: semesterDetails.order,
+      },
+      summary: {
+        totalStudents: registrations.length,
+        attendanceSessions: attendanceStats.totalSessions,
+        attendanceRate: Math.round(attendanceRate * 10) / 10,
+        present: attendanceStats.present,
+        absent: attendanceStats.absent,
+        late: attendanceStats.late,
+        excused: attendanceStats.excused,
+        resultsSubmitted: resultStats.submitted,
+        resultsPending: resultStats.pending,
+        averageScore: Math.round(resultStats.averageScore * 10) / 10,
+        highestScore: resultStats.highestScore,
+        lowestScore: resultStats.lowestScore,
+      },
+      gradeDistribution,
+      students: studentPerformance,
+    });
+  } catch (error) {
+    console.error(
+      "Get lecturer academic report error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to generate academic report",
+    });
+  }
 }
 
 /* =========================================================

@@ -7,6 +7,7 @@ import StudentHeader from "@/components/dashboard/student/header";
 import RegistrationPanel from "@/components/dashboard/student/registration-panel";
 import FeesPanel from "@/components/dashboard/student/fees-panel";
 import StudentResultsPanel from "@/components/student/results/student-results-panel";
+import StudentDashboardSkeleton from "@/components/dashboard/student/student-dashboard-skeleton";
 
 interface MeResponse {
   success: boolean;

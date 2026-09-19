@@ -4,6 +4,7 @@ import {
   assignProgramme,
   createExistingStudent,
   createStaffUser,
+
   getMe,
   getStaffUsers,
   getStaffUserById,
@@ -33,6 +34,8 @@ const router = Router();
  * =========================================================
  * CURRENT AUTHENTICATED USER
  * =========================================================
+ *
+ * GET /api/users/me
  */
 
 router.get(
@@ -45,6 +48,12 @@ router.get(
  * =========================================================
  * CURRENT USER PROFILE
  * =========================================================
+ *
+ * PATCH /api/users/me
+ *
+ * Allows the authenticated user to update:
+ * - name
+ * - email
  */
 
 router.patch(
@@ -57,6 +66,8 @@ router.patch(
  * =========================================================
  * CURRENT USER PASSWORD
  * =========================================================
+ *
+ * PATCH /api/users/me/password
  */
 
 router.patch(
@@ -69,6 +80,8 @@ router.patch(
  * =========================================================
  * STAFF
  * =========================================================
+ *
+ * Admin only.
  */
 
 router.get(
@@ -197,7 +210,9 @@ router.patch(
  * USER BY ID
  * =========================================================
  *
- * Keep this LAST.
+ * IMPORTANT:
+ * This route stays LAST so /me and /staff/:id are not
+ * accidentally interpreted as a generic :id route.
  */
 
 router.get(

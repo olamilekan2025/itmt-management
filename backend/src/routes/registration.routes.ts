@@ -7,12 +7,40 @@ import {
   dropRegistration,
   getCourseRoster,
 } from "../controllers/registration.controller.js";
-import { authenticate, authorize } from "../middleware/auth.middleware.js";
+
+import {
+  authenticate,
+  authorize,
+} from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-router.post("/", authenticate, authorize("student"), registerCourses);
-router.get("/me", authenticate, authorize("student"), getMyRegistrations);
+// =========================================================
+// STUDENT
+// Register courses
+// =========================================================
+router.post(
+  "/",
+  authenticate,
+  authorize("student"),
+  registerCourses,
+);
+
+// =========================================================
+// STUDENT
+// View own registrations
+// =========================================================
+router.get(
+  "/me",
+  authenticate,
+  authorize("student"),
+  getMyRegistrations,
+);
+
+// =========================================================
+// ADMIN / REGISTRAR
+// View all registrations
+// =========================================================
 router.get(
   "/",
   authenticate,
@@ -20,7 +48,21 @@ router.get(
   getRegistrations,
 );
 
-router.get("/roster", authenticate, authorize("lecturer"), getCourseRoster);
+// =========================================================
+// LECTURER
+// View students registered for an assigned course
+// =========================================================
+router.get(
+  "/roster",
+  authenticate,
+  authorize("lecturer"),
+  getCourseRoster,
+);
+
+// =========================================================
+// STUDENT
+// Drop registration
+// =========================================================
 router.patch(
   "/:id/drop",
   authenticate,

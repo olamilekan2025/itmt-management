@@ -27,6 +27,7 @@ import {
 import { createExistingStudent } from "@/lib/admin-students";
 import { getProgrammes } from "@/lib/admin-courses";
 import { getAcademicSessions } from "@/lib/admin-academic-sessions";
+import { AdminFormSkeleton } from "@/components/dashboard/admin/skeletons/admin-form-skeleton";
 
 type Programme = {
   _id: string;
@@ -187,19 +188,7 @@ export default function AddExistingStudentPage() {
   ========================================================= */
 
   if (loadingData) {
-    return (
-      <div className="flex min-h-[500px] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-navy/10">
-            <Loader2 className="h-6 w-6 animate-spin text-brand-navy" />
-          </div>
-
-          <p className="text-sm font-medium text-slate-500">
-            Preparing student registration...
-          </p>
-        </div>
-      </div>
-    );
+    return <AdminFormSkeleton />;
   }
 
   return (

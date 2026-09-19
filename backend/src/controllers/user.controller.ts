@@ -61,6 +61,9 @@ function isDuplicateKeyError(
  * =========================================================
  * COMMON USER SELECT
  * =========================================================
+ *
+ * Keep this centralized so all user responses have a
+ * consistent shape.
  */
 
 const userSelect =
@@ -134,10 +137,11 @@ export async function assignProgramme(
       });
     }
 
-    const programme = await Programme.findOne({
-      _id: data.programme,
-      isActive: true,
-    });
+    const programme =
+      await Programme.findOne({
+        _id: data.programme,
+        isActive: true,
+      });
 
     if (!programme) {
       return res.status(400).json({
@@ -154,22 +158,13 @@ export async function assignProgramme(
     }
 
     if (data.matricNumber !== undefined) {
-      user.matricNumber =
-        data.matricNumber
-          .trim()
-          .toUpperCase();
+      user.matricNumber = data.matricNumber
+        .trim()
+        .toUpperCase();
     }
 
     await user.save();
 
-    /**
-     * =====================================================
-     * AUDIT
-     * =====================================================
-     *
-     * Actor = authenticated administrator/staff member
-     * Target = student being modified
-     */
     await createAuditLog({
       req,
       actorId: req.user?.userId,
@@ -187,8 +182,14 @@ export async function assignProgramme(
         programmeId: programme._id.toString(),
         programmeName: programme.name,
         programmeCode: programme.code,
-        level: data.level !== undefined ? data.level : user.level,
-        matricNumber: data.matricNumber !== undefined ? data.matricNumber.trim().toUpperCase() : user.matricNumber,
+        level:
+          data.level !== undefined
+            ? data.level
+            : user.level,
+        matricNumber:
+          data.matricNumber !== undefined
+            ? data.matricNumber.trim().toUpperCase()
+            : user.matricNumber,
       },
       status: "success",
     });
@@ -209,12 +210,9 @@ export async function assignProgramme(
       await notifyAdmins({
         title:
           "Student Programme Assigned",
-
         message:
           `${user.name} was assigned to ${programme.name}.`,
-
         type: "user",
-
         link:
           "/dashboards/admin/students",
       });
@@ -242,9 +240,7 @@ export async function assignProgramme(
     }
 
     if (isDuplicateKeyError(error)) {
-      if (
-        error.keyPattern?.matricNumber
-      ) {
+      if (error.keyPattern?.matricNumber) {
         return res.status(409).json({
           success: false,
           message:
@@ -351,9 +347,7 @@ export async function createExistingStudent(
       );
 
     const normalizedEmail =
-      data.email
-        .trim()
-        .toLowerCase();
+      data.email.trim().toLowerCase();
 
     const normalizedMatricNumber =
       data.matricNumber
@@ -416,29 +410,17 @@ export async function createExistingStudent(
         email: normalizedEmail,
         password: hashedPassword,
         role: "student",
-
         matricNumber:
           normalizedMatricNumber,
-
         programme:
           programme._id,
-
         academicSession:
           data.academicSession,
-
-        level:
-          data.level,
-
+        level: data.level,
         isEmailVerified: true,
         isActive: true,
         isSuspended: false,
       });
-
-    /**
-     * =====================================================
-     * AUDIT
-     * =====================================================
-     */
 
     await createAuditLog({
       req,
@@ -454,10 +436,14 @@ export async function createExistingStudent(
         studentId: user._id.toString(),
         name: user.name,
         email: user.email,
-        matricNumber: user.matricNumber,
-        programmeId: programme._id.toString(),
-        programmeName: programme.name,
-        academicSessionId: user.academicSession?.toString(),
+        matricNumber:
+          user.matricNumber,
+        programmeId:
+          programme._id.toString(),
+        programmeName:
+          programme.name,
+        academicSessionId:
+          user.academicSession?.toString(),
         level: user.level,
         role: user.role,
       },
@@ -468,12 +454,9 @@ export async function createExistingStudent(
       await notifyAdmins({
         title:
           "New Student Added",
-
         message:
           `${user.name} (${user.matricNumber}) was added as an existing student.`,
-
         type: "user",
-
         link:
           "/dashboards/admin/students",
       });
@@ -486,36 +469,30 @@ export async function createExistingStudent(
 
     return res.status(201).json({
       success: true,
-
       message:
         "Existing student account created successfully",
-
       user: {
         id: user._id,
-
         name: user.name,
-
         email: user.email,
-
         role: user.role,
-
         matricNumber:
           user.matricNumber,
-
         programme:
           user.programme,
-
         academicSession:
           user.academicSession,
-
-        level:
-          user.level,
-
+        level: user.level,
         isActive:
           user.isActive,
-
         isSuspended:
           user.isSuspended,
+        isEmailVerified:
+          user.isEmailVerified,
+        createdAt:
+          user.createdAt,
+        updatedAt:
+          user.updatedAt,
       },
     });
   } catch (error) {
@@ -529,9 +506,7 @@ export async function createExistingStudent(
     }
 
     if (isDuplicateKeyError(error)) {
-      if (
-        error.keyPattern?.matricNumber
-      ) {
+      if (error.keyPattern?.matricNumber) {
         return res.status(409).json({
           success: false,
           message:
@@ -629,8 +604,7 @@ export async function getUserById(
   res: Response,
 ) {
   try {
-    const id =
-      getRouteId(req, res);
+    const id = getRouteId(req, res);
 
     if (!id) {
       return;
@@ -689,10 +663,6 @@ export async function getUserById(
  * =========================================================
  * GET STAFF USER BY ID
  * =========================================================
- *
- * GET /api/users/staff/:id
- *
- * Admin only.
  */
 
 export async function getStaffUserById(
@@ -700,8 +670,7 @@ export async function getStaffUserById(
   res: Response,
 ) {
   try {
-    const id =
-      getRouteId(req, res);
+    const id = getRouteId(req, res);
 
     if (!id) {
       return;
@@ -716,9 +685,16 @@ export async function getStaffUserById(
     }
 
     const user =
-      await User.findById(id).select(
-        "name email role isActive isSuspended isEmailVerified createdAt updatedAt",
-      );
+      await User.findById(id)
+        .select(userSelect)
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "academicSession",
+          "name",
+        );
 
     if (
       !user ||
@@ -760,8 +736,7 @@ export async function activateUser(
   res: Response,
 ) {
   try {
-    const id =
-      getRouteId(req, res);
+    const id = getRouteId(req, res);
 
     if (!id) {
       return;
@@ -805,12 +780,6 @@ export async function activateUser(
 
     await student.save();
 
-    /**
-     * =====================================================
-     * AUDIT
-     * =====================================================
-     */
-
     await createAuditLog({
       req,
       actorId: req.user?.userId,
@@ -820,12 +789,17 @@ export async function activateUser(
       description:
         `Student account for ${student.name} was activated.`,
       targetType: "User",
-      resourceId: student._id.toString(),
+      resourceId:
+        student._id.toString(),
       metadata: {
-        studentId: student._id.toString(),
-        studentName: student.name,
-        studentEmail: student.email,
-        matricNumber: student.matricNumber,
+        studentId:
+          student._id.toString(),
+        studentName:
+          student.name,
+        studentEmail:
+          student.email,
+        matricNumber:
+          student.matricNumber,
       },
       status: "success",
     });
@@ -846,10 +820,8 @@ export async function activateUser(
 
     return res.status(200).json({
       success: true,
-
       message:
         "Student account activated successfully",
-
       user:
         updatedStudent,
     });
@@ -878,8 +850,7 @@ export async function deactivateUser(
   res: Response,
 ) {
   try {
-    const id =
-      getRouteId(req, res);
+    const id = getRouteId(req, res);
 
     if (!id) {
       return;
@@ -919,12 +890,6 @@ export async function deactivateUser(
 
     await student.save();
 
-    /**
-     * =====================================================
-     * AUDIT
-     * =====================================================
-     */
-
     await createAuditLog({
       req,
       actorId: req.user?.userId,
@@ -934,12 +899,17 @@ export async function deactivateUser(
       description:
         `Student account for ${student.name} was deactivated.`,
       targetType: "User",
-      resourceId: student._id.toString(),
+      resourceId:
+        student._id.toString(),
       metadata: {
-        studentId: student._id.toString(),
-        studentName: student.name,
-        studentEmail: student.email,
-        matricNumber: student.matricNumber,
+        studentId:
+          student._id.toString(),
+        studentName:
+          student.name,
+        studentEmail:
+          student.email,
+        matricNumber:
+          student.matricNumber,
       },
       status: "success",
     });
@@ -960,10 +930,8 @@ export async function deactivateUser(
 
     return res.status(200).json({
       success: true,
-
       message:
         "Student account deactivated successfully",
-
       user:
         updatedStudent,
     });
@@ -1039,9 +1007,7 @@ export async function createStaffUser(
       );
 
     const normalizedEmail =
-      data.email
-        .trim()
-        .toLowerCase();
+      data.email.trim().toLowerCase();
 
     const existing =
       await User.findOne({
@@ -1065,31 +1031,13 @@ export async function createStaffUser(
     const user =
       await User.create({
         name: data.name,
-
-        email:
-          normalizedEmail,
-
-        password:
-          hashedPassword,
-
-        role:
-          data.role,
-
-        isEmailVerified:
-          true,
-
-        isActive:
-          true,
-
-        isSuspended:
-          false,
+        email: normalizedEmail,
+        password: hashedPassword,
+        role: data.role,
+        isEmailVerified: true,
+        isActive: true,
+        isSuspended: false,
       });
-
-    /**
-     * =====================================================
-     * AUDIT
-     * =====================================================
-     */
 
     await createAuditLog({
       req,
@@ -1100,9 +1048,11 @@ export async function createStaffUser(
       description:
         `Staff account for ${user.name} was created with the ${user.role} role.`,
       targetType: "User",
-      resourceId: user._id.toString(),
+      resourceId:
+        user._id.toString(),
       metadata: {
-        staffId: user._id.toString(),
+        staffId:
+          user._id.toString(),
         name: user.name,
         email: user.email,
         role: user.role,
@@ -1112,28 +1062,22 @@ export async function createStaffUser(
 
     return res.status(201).json({
       success: true,
-
       message:
         "Staff account created successfully",
-
       user: {
-        id:
-          user._id,
-
-        name:
-          user.name,
-
-        email:
-          user.email,
-
-        role:
-          user.role,
-
-        isActive:
-          user.isActive,
-
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
         isSuspended:
           user.isSuspended,
+        isEmailVerified:
+          user.isEmailVerified,
+        createdAt:
+          user.createdAt,
+        updatedAt:
+          user.updatedAt,
       },
     });
   } catch (error) {
@@ -1172,10 +1116,6 @@ export async function createStaffUser(
  * =========================================================
  * ACTIVATE STAFF
  * =========================================================
- *
- * PATCH /api/users/staff/:id/activate
- *
- * Admin only.
  */
 
 export async function activateStaffUser(
@@ -1183,8 +1123,7 @@ export async function activateStaffUser(
   res: Response,
 ) {
   try {
-    const id =
-      getRouteId(req, res);
+    const id = getRouteId(req, res);
 
     if (!id) {
       return;
@@ -1228,12 +1167,6 @@ export async function activateStaffUser(
 
     await staff.save();
 
-    /**
-     * =====================================================
-     * AUDIT
-     * =====================================================
-     */
-
     await createAuditLog({
       req,
       actorId: req.user?.userId,
@@ -1243,11 +1176,15 @@ export async function activateStaffUser(
       description:
         `Staff account for ${staff.name} was activated.`,
       targetType: "User",
-      resourceId: staff._id.toString(),
+      resourceId:
+        staff._id.toString(),
       metadata: {
-        staffId: staff._id.toString(),
-        staffName: staff.name,
-        staffEmail: staff.email,
+        staffId:
+          staff._id.toString(),
+        staffName:
+          staff.name,
+        staffEmail:
+          staff.email,
         role: staff.role,
       },
       status: "success",
@@ -1256,16 +1193,21 @@ export async function activateStaffUser(
     const updatedStaff =
       await User.findById(
         staff._id,
-      ).select(
-        "name email role isActive isSuspended isEmailVerified createdAt updatedAt",
-      );
+      )
+        .select(userSelect)
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "academicSession",
+          "name",
+        );
 
     return res.status(200).json({
       success: true,
-
       message:
         "Staff account activated successfully",
-
       user:
         updatedStaff,
     });
@@ -1287,10 +1229,6 @@ export async function activateStaffUser(
  * =========================================================
  * DEACTIVATE STAFF
  * =========================================================
- *
- * PATCH /api/users/staff/:id/deactivate
- *
- * Admin only.
  */
 
 export async function deactivateStaffUser(
@@ -1298,8 +1236,7 @@ export async function deactivateStaffUser(
   res: Response,
 ) {
   try {
-    const id =
-      getRouteId(req, res);
+    const id = getRouteId(req, res);
 
     if (!id) {
       return;
@@ -1347,12 +1284,6 @@ export async function deactivateStaffUser(
 
     await staff.save();
 
-    /**
-     * =====================================================
-     * AUDIT
-     * =====================================================
-     */
-
     await createAuditLog({
       req,
       actorId: req.user?.userId,
@@ -1362,11 +1293,15 @@ export async function deactivateStaffUser(
       description:
         `Staff account for ${staff.name} was deactivated.`,
       targetType: "User",
-      resourceId: staff._id.toString(),
+      resourceId:
+        staff._id.toString(),
       metadata: {
-        staffId: staff._id.toString(),
-        staffName: staff.name,
-        staffEmail: staff.email,
+        staffId:
+          staff._id.toString(),
+        staffName:
+          staff.name,
+        staffEmail:
+          staff.email,
         role: staff.role,
       },
       status: "success",
@@ -1375,16 +1310,21 @@ export async function deactivateStaffUser(
     const updatedStaff =
       await User.findById(
         staff._id,
-      ).select(
-        "name email role isActive isSuspended isEmailVerified createdAt updatedAt",
-      );
+      )
+        .select(userSelect)
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "academicSession",
+          "name",
+        );
 
     return res.status(200).json({
       success: true,
-
       message:
         "Staff account deactivated successfully",
-
       user:
         updatedStaff,
     });
@@ -1406,10 +1346,6 @@ export async function deactivateStaffUser(
  * =========================================================
  * SUSPEND STAFF
  * =========================================================
- *
- * PATCH /api/users/staff/:id/suspend
- *
- * Admin only.
  */
 
 export async function suspendStaffUser(
@@ -1417,8 +1353,7 @@ export async function suspendStaffUser(
   res: Response,
 ) {
   try {
-    const id =
-      getRouteId(req, res);
+    const id = getRouteId(req, res);
 
     if (!id) {
       return;
@@ -1467,12 +1402,6 @@ export async function suspendStaffUser(
 
     await staff.save();
 
-    /**
-     * =====================================================
-     * AUDIT
-     * =====================================================
-     */
-
     await createAuditLog({
       req,
       actorId: req.user?.userId,
@@ -1482,14 +1411,20 @@ export async function suspendStaffUser(
       description:
         `Staff account for ${staff.name} was suspended.`,
       targetType: "User",
-      resourceId: staff._id.toString(),
+      resourceId:
+        staff._id.toString(),
       metadata: {
-        staffId: staff._id.toString(),
-        staffName: staff.name,
-        staffEmail: staff.email,
+        staffId:
+          staff._id.toString(),
+        staffName:
+          staff.name,
+        staffEmail:
+          staff.email,
         role: staff.role,
-        isActive: staff.isActive,
-        isSuspended: staff.isSuspended,
+        isActive:
+          staff.isActive,
+        isSuspended:
+          staff.isSuspended,
       },
       status: "success",
     });
@@ -1497,16 +1432,21 @@ export async function suspendStaffUser(
     const updatedStaff =
       await User.findById(
         staff._id,
-      ).select(
-        "name email role isActive isSuspended isEmailVerified createdAt updatedAt",
-      );
+      )
+        .select(userSelect)
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "academicSession",
+          "name",
+        );
 
     return res.status(200).json({
       success: true,
-
       message:
         "Staff account suspended successfully",
-
       user:
         updatedStaff,
     });
@@ -1528,10 +1468,6 @@ export async function suspendStaffUser(
  * =========================================================
  * UNSUSPEND STAFF
  * =========================================================
- *
- * PATCH /api/users/staff/:id/unsuspend
- *
- * Admin only.
  */
 
 export async function unsuspendStaffUser(
@@ -1539,8 +1475,7 @@ export async function unsuspendStaffUser(
   res: Response,
 ) {
   try {
-    const id =
-      getRouteId(req, res);
+    const id = getRouteId(req, res);
 
     if (!id) {
       return;
@@ -1581,12 +1516,6 @@ export async function unsuspendStaffUser(
 
     await staff.save();
 
-    /**
-     * =====================================================
-     * AUDIT
-     * =====================================================
-     */
-
     await createAuditLog({
       req,
       actorId: req.user?.userId,
@@ -1596,14 +1525,20 @@ export async function unsuspendStaffUser(
       description:
         `Staff account for ${staff.name} was unsuspended and activated.`,
       targetType: "User",
-      resourceId: staff._id.toString(),
+      resourceId:
+        staff._id.toString(),
       metadata: {
-        staffId: staff._id.toString(),
-        staffName: staff.name,
-        staffEmail: staff.email,
+        staffId:
+          staff._id.toString(),
+        staffName:
+          staff.name,
+        staffEmail:
+          staff.email,
         role: staff.role,
-        isActive: staff.isActive,
-        isSuspended: staff.isSuspended,
+        isActive:
+          staff.isActive,
+        isSuspended:
+          staff.isSuspended,
       },
       status: "success",
     });
@@ -1611,16 +1546,21 @@ export async function unsuspendStaffUser(
     const updatedStaff =
       await User.findById(
         staff._id,
-      ).select(
-        "name email role isActive isSuspended isEmailVerified createdAt updatedAt",
-      );
+      )
+        .select(userSelect)
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "academicSession",
+          "name",
+        );
 
     return res.status(200).json({
       success: true,
-
       message:
         "Staff account unsuspended and activated successfully",
-
       user:
         updatedStaff,
     });
@@ -1642,6 +1582,14 @@ export async function unsuspendStaffUser(
  * =========================================================
  * GET CURRENT USER
  * =========================================================
+ *
+ * GET /api/users/me
+ *
+ * This is used by the lecturer profile page.
+ *
+ * IMPORTANT:
+ * createdAt and updatedAt are intentionally returned
+ * because the frontend displays "Member Since".
  */
 
 export async function getMe(
@@ -1683,29 +1631,25 @@ export async function getMe(
       success: true,
 
       user: {
-        id:
-          user._id,
+        id: user._id.toString(),
 
-        name:
-          user.name,
+        name: user.name,
 
-        email:
-          user.email,
+        email: user.email,
 
-        role:
-          user.role,
+        role: user.role,
 
         programme:
-          user.programme,
+          user.programme ?? null,
 
         academicSession:
-          user.academicSession,
+          user.academicSession ?? null,
 
         level:
-          user.level,
+          user.level ?? null,
 
         matricNumber:
-          user.matricNumber,
+          user.matricNumber ?? null,
 
         isActive:
           user.isActive,
@@ -1715,6 +1659,12 @@ export async function getMe(
 
         isEmailVerified:
           user.isEmailVerified,
+
+        createdAt:
+          user.createdAt,
+
+        updatedAt:
+          user.updatedAt,
       },
     });
   } catch (error) {
@@ -1748,8 +1698,14 @@ export async function getStaffUsers(
           $ne: "student",
         },
       })
-        .select(
-          "name email role isActive isSuspended isEmailVerified createdAt updatedAt",
+        .select(userSelect)
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "academicSession",
+          "name",
         )
         .sort({
           createdAt: -1,
@@ -1777,32 +1733,40 @@ export async function getStaffUsers(
  * =========================================================
  * UPDATE CURRENT USER PROFILE
  * =========================================================
+ *
+ * Currently lecturers/staff can edit only:
+ * - name
+ * - email
+ *
+ * Institution-controlled fields remain protected.
  */
 
 const updateProfileSchema =
-  z.object({
-    name: z
-      .string()
-      .trim()
-      .min(
-        2,
-        "Name must be at least 2 characters",
-      )
-      .max(
-        100,
-        "Name is too long",
-      )
-      .optional(),
+  z
+    .object({
+      name: z
+        .string()
+        .trim()
+        .min(
+          2,
+          "Name must be at least 2 characters",
+        )
+        .max(
+          100,
+          "Name is too long",
+        )
+        .optional(),
 
-    email: z
-      .string()
-      .trim()
-      .toLowerCase()
-      .email(
-        "Enter a valid email address",
-      )
-      .optional(),
-  });
+      email: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .email(
+          "Enter a valid email address",
+        )
+        .optional(),
+    })
+    .strict();
 
 export async function updateMyProfile(
   req: AuthRequest,
@@ -1850,68 +1814,100 @@ export async function updateMyProfile(
 
     if (data.email !== undefined) {
       const normalizedEmail =
-        data.email
-          .trim()
-          .toLowerCase();
+        data.email.trim().toLowerCase();
 
-      const existingEmail =
-        await User.findOne({
-          email:
-            normalizedEmail,
+      if (
+        normalizedEmail !==
+        user.email.toLowerCase()
+      ) {
+        const existingEmail =
+          await User.findOne({
+            email: normalizedEmail,
+            _id: {
+              $ne: user._id,
+            },
+          });
 
-          _id: {
-            $ne: user._id,
-          },
-        });
+        if (existingEmail) {
+          return res.status(409).json({
+            success: false,
+            message:
+              "An account with this email already exists",
+          });
+        }
 
-      if (existingEmail) {
-        return res.status(409).json({
-          success: false,
-          message:
-            "An account with this email already exists",
-        });
+        user.email =
+          normalizedEmail;
+
+        user.isEmailVerified =
+          false;
+
+        changedFields.push(
+          "email",
+        );
       }
-
-      user.email =
-        normalizedEmail;
-
-      user.isEmailVerified =
-        false;
-
-      changedFields.push(
-        "email",
-      );
     }
 
     if (data.name !== undefined) {
-      user.name =
-        data.name;
+      const normalizedName =
+        data.name.trim();
 
-      changedFields.push(
-        "name",
-      );
+      if (
+        normalizedName !==
+        user.name
+      ) {
+        user.name =
+          normalizedName;
+
+        changedFields.push(
+          "name",
+        );
+      }
+    }
+
+    if (changedFields.length === 0) {
+      const unchangedUser =
+        await User.findById(
+          user._id,
+        )
+          .select(userSelect)
+          .populate(
+            "programme",
+            "name code",
+          )
+          .populate(
+            "academicSession",
+            "name",
+          );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "No profile changes were made",
+        user:
+          unchangedUser,
+      });
     }
 
     await user.save();
 
-    /**
-     * =====================================================
-     * AUDIT
-     * =====================================================
-     */
-
     await createAuditLog({
       req,
-      actorId: user._id.toString(),
-      actorName: user.name,
-      actorEmail: user.email,
-      actorRole: user.role,
+      actorId:
+        user._id.toString(),
+      actorName:
+        user.name,
+      actorEmail:
+        user.email,
+      actorRole:
+        user.role,
       action: "UPDATE",
       module: "USERS",
       description:
         `${user.name} updated their profile.`,
       targetType: "User",
-      resourceId: user._id.toString(),
+      resourceId:
+        user._id.toString(),
       metadata: {
         changedFields,
       },
@@ -1934,10 +1930,8 @@ export async function updateMyProfile(
 
     return res.status(200).json({
       success: true,
-
       message:
         "Profile updated successfully",
-
       user:
         updatedUser,
     });
@@ -2014,7 +2008,6 @@ const changePasswordSchema =
       {
         message:
           "Passwords do not match",
-
         path: [
           "confirmPassword",
         ],
@@ -2098,37 +2091,32 @@ export async function changeMyPassword(
 
     await user.save();
 
-    /**
-     * =====================================================
-     * AUDIT
-     * =====================================================
-     *
-     * IMPORTANT:
-     * No password, password hash, or password
-     * confirmation is stored in the audit log.
-     */
-
     await createAuditLog({
       req,
-      actorId: user._id.toString(),
-      actorName: user.name,
-      actorEmail: user.email,
-      actorRole: user.role,
+      actorId:
+        user._id.toString(),
+      actorName:
+        user.name,
+      actorEmail:
+        user.email,
+      actorRole:
+        user.role,
       action: "PASSWORD_RESET",
       module: "AUTH",
       description:
         `${user.name} changed their account password.`,
       targetType: "Auth",
-      resourceId: user._id.toString(),
+      resourceId:
+        user._id.toString(),
       metadata: {
-        method: "change-password",
+        method:
+          "change-password",
       },
       status: "success",
     });
 
     return res.status(200).json({
       success: true,
-
       message:
         "Password changed successfully",
     });
