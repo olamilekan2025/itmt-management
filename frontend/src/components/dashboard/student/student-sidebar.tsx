@@ -4,38 +4,32 @@ import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
-
 import {
-  Activity,
   AlertTriangle,
   BarChart3,
   Bell,
   BookOpen,
-  CalendarDays,
+  CalendarCheck,
   ChevronDown,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  ClipboardCheck,
   ClipboardList,
+  CreditCard,
   FileBarChart,
   FileText,
   GraduationCap,
-  ImageIcon,
   LayoutDashboard,
   Loader2,
   LogOut,
   Megaphone,
-  ScrollText,
+  Receipt,
   Settings,
   ShieldCheck,
-  UserCog,
   UserRound,
-  Users,
+  WalletCards,
   X,
-  Building2,
 } from "lucide-react";
-
 import {
   useEffect,
   useRef,
@@ -58,16 +52,11 @@ interface NavSection {
   items: NavItem[];
 }
 
-interface AdminSidebarProps {
+interface StudentSidebarProps {
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
-
-  /*
-   * Kept for compatibility with your existing AdminLayout.
-   * If your layout currently passes `onClose`, it will still work.
-   */
   onClose?: () => void;
 }
 
@@ -81,117 +70,71 @@ const navigation: NavSection[] = [
     items: [
       {
         label: "Dashboard",
-        href: "/dashboards/admin",
+        href: "/dashboards/student",
         icon: LayoutDashboard,
       },
     ],
   },
 
   {
-    label: "People",
+    label: "Academic",
     items: [
       {
-        label: "Students",
-        href: "/dashboards/admin/students",
-        icon: GraduationCap,
-      },
-      {
-        label: "Add Existing Student",
-        href: "/dashboards/admin/existing",
-        icon: UserRound,
-      },
-      {
-        label: "Lecturers",
-        href: "/dashboards/admin/lecturers",
-        icon: UserCog,
-      },
-      {
-        label: "Staff",
-        href: "/dashboards/admin/staff",
-        icon: UserRound,
-      },
-      {
-        label: "Users",
-        href: "/dashboards/admin/users",
-        icon: Users,
-      },
-    ],
-  },
-
-  {
-    label: "Academic Management",
-    items: [
-      {
-        label: "Departments",
-        href: "/dashboards/admin/departments",
-        icon: Building2,
-      },
-      {
-        label: "Programmes",
-        href: "/dashboards/admin/programmes",
+        label: "My Courses",
+        href: "/dashboards/student/courses",
         icon: BookOpen,
       },
       {
-        label: "Academic Sessions",
-        href: "/dashboards/admin/sessions",
-        icon: CalendarDays,
-      },
-      {
-        label: "Semesters",
-        href: "/dashboards/admin/semesters",
-        icon: CalendarDays,
-      },
-      {
-        label: "Courses",
-        href: "/dashboards/admin/courses",
-        icon: BookOpen,
-      },
-      {
-        label: "Registrations",
-        href: "/dashboards/admin/registrations",
+        label: "Course Registration",
+        href: "/dashboards/student/registration",
         icon: ClipboardList,
       },
       {
-        label: "Lecturer Assignments",
-        href: "/dashboards/admin/lecturer-assignments",
-        icon: UserCog,
-      },
-    ],
-  },
-
-  {
-    label: "Results & Assessment",
-    items: [
-      {
         label: "Results",
-        href: "/dashboards/admin/results",
+        href: "/dashboards/student/results",
         icon: BarChart3,
       },
       {
-        label: "Result Approval",
-        href: "/dashboards/admin/results/approval",
-        icon: ClipboardCheck,
+        label: "Academic Progress",
+        href: "/dashboards/student/progress",
+        icon: GraduationCap,
       },
       {
-        label: "Result Reports",
-        href: "/dashboards/admin/results/reports",
-        icon: FileBarChart,
-      },
-      {
-        label: "Transcript Requests",
-        href: "/dashboards/admin/transcript-requests",
+        label: "Transcript",
+        href: "/dashboards/student/transcript",
         icon: FileText,
       },
     ],
   },
 
   {
-    label: "Admissions",
+    label: "Attendance",
     items: [
       {
-        label: "Applications",
-        href: "/dashboards/admin/applications",
-        icon: ClipboardList,
+        label: "My Attendance",
+        href: "/dashboards/student/attendance",
+        icon: CalendarCheck,
+      },
+    ],
+  },
+
+  {
+    label: "Finance",
+    items: [
+      {
+        label: "School Fees",
+        href: "/dashboards/student/finance",
+        icon: WalletCards,
+      },
+      {
+        label: "Payment History",
+        href: "/dashboards/student/payments",
+        icon: Receipt,
+      },
+      {
+        label: "Outstanding Fees",
+        href: "/dashboards/student/outstanding",
+        icon: CreditCard,
       },
     ],
   },
@@ -200,56 +143,41 @@ const navigation: NavSection[] = [
     label: "Communication",
     items: [
       {
-        label: "Notifications",
-        href: "/dashboards/admin/notifications",
-        icon: Bell,
-      },
-      {
         label: "Announcements",
-        href: "/dashboards/admin/announcements",
+        href: "/dashboards/student/announcements",
         icon: Megaphone,
       },
+      {
+        label: "Notifications",
+        href: "/dashboards/student/notifications",
+        icon: Bell,
+      },
     ],
   },
 
   {
-    label: "Reports",
+    label: "Documents",
     items: [
       {
-        label: "Academic Reports",
-        href: "/dashboards/admin/academic-reports",
+        label: "My Documents",
+        href: "/dashboards/student/documents",
         icon: FileBarChart,
       },
-      {
-        label: "Student Reports",
-        href: "/dashboards/admin/reports/students",
-        icon: Users,
-      },
-      {
-        label: "System Reports",
-        href: "/dashboards/admin/reports/system",
-        icon: Activity,
-      },
     ],
   },
 
   {
-    label: "System",
+    label: "Account",
     items: [
       {
-        label: "Audit Logs",
-        href: "/dashboards/admin/audit-logs",
-        icon: ScrollText,
+        label: "My Profile",
+        href: "/dashboards/student/profile",
+        icon: UserRound,
       },
       {
         label: "Settings",
-        href: "/dashboards/admin/settings",
+        href: "/dashboards/student/settings",
         icon: Settings,
-      },
-      {
-        label: "Hero Section",
-        href: "/dashboards/admin/hero-slides",
-        icon: ImageIcon,
       },
     ],
   },
@@ -259,13 +187,13 @@ const navigation: NavSection[] = [
    COMPONENT
 ========================================================= */
 
-export default function AdminSidebar({
+export default function StudentSidebar({
   collapsed = false,
   onCollapsedChange,
   mobileOpen = false,
   onMobileClose,
   onClose,
-}: AdminSidebarProps) {
+}: StudentSidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
 
@@ -276,44 +204,41 @@ export default function AdminSidebar({
   const profileRef = useRef<HTMLDivElement>(null);
 
   /* =======================================================
-     MOBILE CLOSE COMPATIBILITY
+     MOBILE CLOSE
   ======================================================= */
 
-  function closeMobileSidebar() {
+  const closeMobileSidebar = () => {
     onMobileClose?.();
     onClose?.();
-  }
+  };
 
   /* =======================================================
      USER INFORMATION
   ======================================================= */
 
   const userName =
-    session?.user?.name?.trim() || "Administrator";
+    session?.user?.name?.trim() || "Student";
 
   const userEmail =
     session?.user?.email?.trim() ||
-    "admin@itmt.edu.ng";
+    "student@itmt.edu.ng";
 
-  const userImage =
-    session?.user?.image || null;
+  const userImage = session?.user?.image || null;
 
   const initials =
     userName
       .split(" ")
       .filter(Boolean)
       .slice(0, 2)
-      .map((part) =>
-        part.charAt(0).toUpperCase(),
-      )
-      .join("") || "AD";
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("") || "ST";
 
   /* =======================================================
      ACTIVE NAVIGATION
   ======================================================= */
 
-  function isActive(href: string) {
-    if (href === "/dashboards/admin") {
+  const isActive = (href: string) => {
+    if (href === "/dashboards/student") {
       return pathname === href;
     }
 
@@ -321,36 +246,34 @@ export default function AdminSidebar({
       pathname === href ||
       pathname.startsWith(`${href}/`)
     );
-  }
+  };
 
   /* =======================================================
      NAVIGATION CLICK
   ======================================================= */
 
-  function handleNavClick() {
+  const handleNavClick = () => {
     closeMobileSidebar();
     setProfileOpen(false);
-  }
+  };
 
   /* =======================================================
      PROFILE
   ======================================================= */
 
-  function toggleProfile() {
+  const toggleProfile = () => {
     setProfileOpen((current) => !current);
-  }
+  };
 
   useEffect(() => {
-    function handleOutsideClick(event: MouseEvent) {
+    const handleOutsideClick = (event: MouseEvent) => {
       if (
         profileRef.current &&
-        !profileRef.current.contains(
-          event.target as Node,
-        )
+        !profileRef.current.contains(event.target as Node)
       ) {
         setProfileOpen(false);
       }
-    }
+    };
 
     if (profileOpen) {
       document.addEventListener(
@@ -372,12 +295,15 @@ export default function AdminSidebar({
   ======================================================= */
 
   useEffect(() => {
-    function handleEscape(event: KeyboardEvent) {
+    const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setProfileOpen(false);
-        setLogoutModalOpen(false);
+
+        if (!signingOut) {
+          setLogoutModalOpen(false);
+        }
       }
-    }
+    };
 
     document.addEventListener(
       "keydown",
@@ -390,24 +316,24 @@ export default function AdminSidebar({
         handleEscape,
       );
     };
-  }, []);
+  }, [signingOut]);
 
   /* =======================================================
      LOGOUT
   ======================================================= */
 
-  function openLogoutModal() {
+  const openLogoutModal = () => {
     setProfileOpen(false);
     setLogoutModalOpen(true);
-  }
+  };
 
-  function closeLogoutModal() {
+  const closeLogoutModal = () => {
     if (signingOut) return;
 
     setLogoutModalOpen(false);
-  }
+  };
 
-  async function handleSignOut() {
+  const handleSignOut = async () => {
     if (signingOut) return;
 
     try {
@@ -418,29 +344,29 @@ export default function AdminSidebar({
       });
     } catch (error) {
       console.error(
-        "Admin sign out error:",
+        "Student sign out error:",
         error,
       );
 
       setSigningOut(false);
       setLogoutModalOpen(false);
     }
-  }
+  };
 
   /* =======================================================
      PROFILE ACTIVE STATES
   ======================================================= */
 
   const profileActive =
-    pathname === "/dashboards/admin/profile" ||
+    pathname === "/dashboards/student/profile" ||
     pathname.startsWith(
-      "/dashboards/admin/profile/",
+      "/dashboards/student/profile/",
     );
 
   const settingsActive =
-    pathname === "/dashboards/admin/settings" ||
+    pathname === "/dashboards/student/settings" ||
     pathname.startsWith(
-      "/dashboards/admin/settings/",
+      "/dashboards/student/settings/",
     );
 
   /* =======================================================
@@ -482,6 +408,7 @@ export default function AdminSidebar({
       ====================================================== */}
 
       <aside
+        aria-label="Student navigation"
         className={`
           fixed
           inset-y-0
@@ -531,7 +458,7 @@ export default function AdminSidebar({
         <button
           type="button"
           onClick={closeMobileSidebar}
-          aria-label="Close menu"
+          aria-label="Close student navigation"
           className="
             absolute
             right-3
@@ -601,8 +528,6 @@ export default function AdminSidebar({
               }
             `}
           >
-            {/* Decorative glow */}
-
             <div
               className="
                 pointer-events-none
@@ -621,14 +546,12 @@ export default function AdminSidebar({
               "
             />
 
-            {/* Logo */}
-
             <Link
-              href="/dashboards/admin"
+              href="/dashboards/student"
               onClick={handleNavClick}
               title={
                 collapsed
-                  ? "ITMT Admin Portal"
+                  ? "ITMT Student Portal"
                   : undefined
               }
               className={`
@@ -702,7 +625,7 @@ export default function AdminSidebar({
                 </p>
 
                 <p className="mt-0.5 whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.16em] text-white/40">
-                  Administration Portal
+                  Student Portal
                 </p>
               </div>
             </Link>
@@ -756,7 +679,7 @@ export default function AdminSidebar({
                   }
                 `}
               >
-                Administration system online
+                Student portal online
               </span>
             </div>
           </div>
@@ -783,8 +706,6 @@ export default function AdminSidebar({
           <div className="space-y-6">
             {navigation.map((section) => (
               <div key={section.label}>
-                {/* Section heading */}
-
                 <div
                   className={`
                     mb-2
@@ -825,8 +746,6 @@ export default function AdminSidebar({
                     </>
                   )}
                 </div>
-
-                {/* Section items */}
 
                 <div className="space-y-1">
                   {section.items.map((item) => {
@@ -880,8 +799,6 @@ export default function AdminSidebar({
                           }
                         `}
                       >
-                        {/* Active indicator */}
-
                         <span
                           className={`
                             absolute
@@ -903,8 +820,6 @@ export default function AdminSidebar({
                             }
                           `}
                         />
-
-                        {/* Icon */}
 
                         <span
                           className={`
@@ -930,8 +845,6 @@ export default function AdminSidebar({
                         >
                           <Icon className="h-4 w-4" />
                         </span>
-
-                        {/* Label */}
 
                         <span
                           className={`
@@ -964,8 +877,6 @@ export default function AdminSidebar({
                         >
                           {item.label}
                         </span>
-
-                        {/* Arrow */}
 
                         <ChevronRight
                           className={`
@@ -1016,8 +927,6 @@ export default function AdminSidebar({
             }
           `}
         >
-          {/* Profile button */}
-
           <button
             type="button"
             onClick={toggleProfile}
@@ -1055,8 +964,6 @@ export default function AdminSidebar({
               }
             `}
           >
-            {/* Avatar */}
-
             <div
               className="
                 relative
@@ -1118,8 +1025,6 @@ export default function AdminSidebar({
                 "
               />
             </div>
-
-            {/* User information */}
 
             <div
               className={`
@@ -1208,8 +1113,6 @@ export default function AdminSidebar({
                 }
               `}
             >
-              {/* Profile header */}
-
               <div className="border-b border-white/[0.07] bg-white/[0.025] p-4">
                 <div className="flex items-center gap-3">
                   <div
@@ -1265,18 +1168,16 @@ export default function AdminSidebar({
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
 
                   <span className="text-[10px] font-medium text-emerald-300/80">
-                    Administrator account active
+                    Student account active
                   </span>
                 </div>
               </div>
-
-              {/* Menu */}
 
               <div className="p-2">
                 {/* Profile */}
 
                 <Link
-                  href="/dashboards/admin/profile"
+                  href="/dashboards/student/profile"
                   onClick={() => {
                     setProfileOpen(false);
                     closeMobileSidebar();
@@ -1372,7 +1273,7 @@ export default function AdminSidebar({
                 {/* Settings */}
 
                 <Link
-                  href="/dashboards/admin/settings"
+                  href="/dashboards/student/settings"
                   onClick={() => {
                     setProfileOpen(false);
                     closeMobileSidebar();
@@ -1465,8 +1366,6 @@ export default function AdminSidebar({
                   />
                 </Link>
 
-                {/* Divider */}
-
                 <div className="my-1 border-t border-white/[0.06]" />
 
                 {/* Sign out */}
@@ -1526,17 +1425,15 @@ export default function AdminSidebar({
                     </p>
 
                     <p className="mt-0.5 text-[10px] text-white/30">
-                      End your administrator session
+                      End your student session
                     </p>
                   </div>
                 </button>
               </div>
 
-              {/* Footer */}
-
               <div className="border-t border-white/[0.06] px-4 py-2.5">
                 <p className="text-center text-[9px] uppercase tracking-[0.16em] text-white/20">
-                  ITMT Administration Portal
+                  ITMT Student Portal
                 </p>
               </div>
             </div>
@@ -1564,7 +1461,7 @@ export default function AdminSidebar({
               }
             `}
           >
-            ITMT MANAGEMENT SYSTEM • ADMINISTRATION
+            ITMT MANAGEMENT SYSTEM • STUDENT PORTAL
           </p>
         </div>
 
@@ -1660,12 +1557,10 @@ export default function AdminSidebar({
           "
           role="dialog"
           aria-modal="true"
-          aria-labelledby="admin-logout-title"
-          aria-describedby="admin-logout-description"
+          aria-labelledby="student-logout-title"
+          aria-describedby="student-logout-description"
           onMouseDown={(event) => {
-            if (
-              event.target === event.currentTarget
-            ) {
+            if (event.target === event.currentTarget) {
               closeLogoutModal();
             }
           }}
@@ -1689,8 +1584,6 @@ export default function AdminSidebar({
               shadow-[0_30px_100px_rgba(0,0,0,0.45)]
             "
           >
-            {/* Decorative glow */}
-
             <div
               className="
                 pointer-events-none
@@ -1729,8 +1622,6 @@ export default function AdminSidebar({
               "
             />
 
-            {/* Close */}
-
             <button
               type="button"
               onClick={closeLogoutModal}
@@ -1765,8 +1656,6 @@ export default function AdminSidebar({
             </button>
 
             <div className="relative p-6 sm:p-7">
-              {/* Warning icon */}
-
               <div
                 className="
                   mb-5
@@ -1794,15 +1683,13 @@ export default function AdminSidebar({
                 <AlertTriangle className="h-6 w-6" />
               </div>
 
-              {/* Heading */}
-
               <div>
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-brand-gold">
-                  Administration Portal
+                  Student Portal
                 </p>
 
                 <h2
-                  id="admin-logout-title"
+                  id="student-logout-title"
                   className="
                     text-xl
                     font-bold
@@ -1816,7 +1703,7 @@ export default function AdminSidebar({
                 </h2>
 
                 <p
-                  id="admin-logout-description"
+                  id="student-logout-description"
                   className="
                     mt-3
 
@@ -1825,13 +1712,11 @@ export default function AdminSidebar({
                     text-white/50
                   "
                 >
-                  You are about to leave your
-                  administrator account. Your current
-                  session will be securely ended.
+                  You are about to leave your student
+                  account. Your current session will be
+                  securely ended.
                 </p>
               </div>
-
-              {/* User preview */}
 
               <div
                 className="
@@ -1901,8 +1786,6 @@ export default function AdminSidebar({
 
                 <ShieldCheck className="ml-auto h-4 w-4 shrink-0 text-emerald-400/70" />
               </div>
-
-              {/* Buttons */}
 
               <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
@@ -1993,3 +1876,4 @@ export default function AdminSidebar({
     </>
   );
 }
+

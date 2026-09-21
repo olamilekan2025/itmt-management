@@ -1,4 +1,3 @@
-
 import type { Request, Response } from "express";
 import { z } from "zod";
 
@@ -37,6 +36,12 @@ export async function createAcademicSession(
   res: Response,
 ) {
   try {
+    /**
+     * -------------------------------------------------------
+     * VALIDATE REQUEST BODY
+     * -------------------------------------------------------
+     */
+
     const parsed = sessionSchema.safeParse(req.body);
 
     if (!parsed.success) {
@@ -55,26 +60,36 @@ export async function createAcademicSession(
     } = parsed.data;
 
     /**
-     * Prevent duplicate session names.
+     * -------------------------------------------------------
+     * CHECK FOR DUPLICATE SESSION
+     * -------------------------------------------------------
      */
-    const existingSession = await AcademicSession.findOne({
-      name: {
-        $regex: `^${name}$`,
-        $options: "i",
-      },
-    });
+
+    const existingSession =
+      await AcademicSession.findOne({
+        name: {
+          $regex: `^${name}$`,
+          $options: "i",
+        },
+      });
 
     if (existingSession) {
       return res.status(409).json({
         success: false,
-        message: "An academic session with this name already exists.",
+        message:
+          "An academic session with this name already exists.",
       });
     }
 
     /**
-     * If this session should be active,
-     * deactivate all existing sessions first.
+     * -------------------------------------------------------
+     * HANDLE ACTIVE SESSION
+     * -------------------------------------------------------
+     *
+     * Only one academic session can be active
+     * at a time.
      */
+
     if (isActive) {
       await AcademicSession.updateMany(
         {},
@@ -86,17 +101,33 @@ export async function createAcademicSession(
       );
     }
 
-    const academicSession = await AcademicSession.create({
-      name,
-      startDate,
-      endDate,
-      isActive,
-    });
+    /**
+     * -------------------------------------------------------
+     * CREATE SESSION
+     * -------------------------------------------------------
+     */
+
+    const academicSession =
+      await AcademicSession.create({
+        name,
+        startDate,
+        endDate,
+        isActive,
+      });
+
+    /**
+     * -------------------------------------------------------
+     * SUCCESS RESPONSE
+     * -------------------------------------------------------
+     *
+     * Frontend expects `session`.
+     */
 
     return res.status(201).json({
       success: true,
-      message: "Academic session created successfully.",
-      academicSession,
+      message:
+        "Academic session created successfully.",
+      session: academicSession,
     });
   } catch (error) {
     console.error(
@@ -106,7 +137,8 @@ export async function createAcademicSession(
 
     return res.status(500).json({
       success: false,
-      message: "Failed to create academic session.",
+      message:
+        "Failed to create academic session.",
     });
   }
 }
@@ -119,12 +151,20 @@ export async function createAcademicSession(
  * GET /api/academic-sessions
  *
  * Protected route.
+ *
+ * Returns all academic sessions.
  */
 export async function getAcademicSessions(
   _req: Request,
   res: Response,
 ) {
   try {
+    /**
+     * -------------------------------------------------------
+     * FETCH ALL SESSIONS
+     * -------------------------------------------------------
+     */
+
     const academicSessions =
       await AcademicSession.find()
         .sort({
@@ -132,9 +172,17 @@ export async function getAcademicSessions(
         })
         .lean();
 
+    /**
+     * -------------------------------------------------------
+     * SUCCESS RESPONSE
+     * -------------------------------------------------------
+     *
+     * Frontend expects `sessions`.
+     */
+
     return res.status(200).json({
       success: true,
-      academicSessions,
+      sessions: academicSessions,
     });
   } catch (error) {
     console.error(
@@ -144,7 +192,8 @@ export async function getAcademicSessions(
 
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch academic sessions.",
+      message:
+        "Failed to fetch academic sessions.",
     });
   }
 }
@@ -168,19 +217,36 @@ export async function getPublicAcademicSessions(
   res: Response,
 ) {
   try {
+    /**
+     * -------------------------------------------------------
+     * FETCH ACTIVE SESSIONS
+     * -------------------------------------------------------
+     */
+
     const academicSessions =
       await AcademicSession.find({
         isActive: true,
       })
-        .select("name isActive startDate endDate")
+        .select(
+          "name isActive startDate endDate",
+        )
         .sort({
           startDate: -1,
         })
         .lean();
 
+    /**
+     * -------------------------------------------------------
+     * SUCCESS RESPONSE
+     * -------------------------------------------------------
+     *
+     * Keep the response property consistent
+     * with the frontend API contract.
+     */
+
     return res.status(200).json({
       success: true,
-      academicSessions,
+      sessions: academicSessions,
     });
   } catch (error) {
     console.error(
@@ -190,7 +256,8 @@ export async function getPublicAcademicSessions(
 
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch public academic sessions.",
+      message:
+        "Failed to fetch public academic sessions.",
     });
   }
 }
@@ -201,6 +268,8 @@ export async function getPublicAcademicSessions(
  * =========================================================
  *
  * PATCH /api/academic-sessions/:id/activate
+ *
+ * Only one academic session can be active.
  */
 export async function activateAcademicSession(
   req: Request,
@@ -209,20 +278,29 @@ export async function activateAcademicSession(
   try {
     const { id } = req.params;
 
+    /**
+     * -------------------------------------------------------
+     * FIND SESSION
+     * -------------------------------------------------------
+     */
+
     const academicSession =
       await AcademicSession.findById(id);
 
     if (!academicSession) {
       return res.status(404).json({
         success: false,
-        message: "Academic session not found.",
+        message:
+          "Academic session not found.",
       });
     }
 
     /**
-     * Only one academic session should be active
-     * at a time.
+     * -------------------------------------------------------
+     * DEACTIVATE ALL OTHER SESSIONS
+     * -------------------------------------------------------
      */
+
     await AcademicSession.updateMany(
       {
         _id: {
@@ -236,14 +314,29 @@ export async function activateAcademicSession(
       },
     );
 
+    /**
+     * -------------------------------------------------------
+     * ACTIVATE SELECTED SESSION
+     * -------------------------------------------------------
+     */
+
     academicSession.isActive = true;
 
     await academicSession.save();
 
+    /**
+     * -------------------------------------------------------
+     * SUCCESS RESPONSE
+     * -------------------------------------------------------
+     *
+     * Frontend expects `session`.
+     */
+
     return res.status(200).json({
       success: true,
-      message: "Academic session activated successfully.",
-      academicSession,
+      message:
+        "Academic session activated successfully.",
+      session: academicSession,
     });
   } catch (error) {
     console.error(
@@ -253,8 +346,8 @@ export async function activateAcademicSession(
 
     return res.status(500).json({
       success: false,
-      message: "Failed to activate academic session.",
+      message:
+        "Failed to activate academic session.",
     });
   }
 }
-

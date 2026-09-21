@@ -58,15 +58,23 @@ function normalizePath(path: string): string {
 
 /* =========================================================
    NORMALIZE API PATH
-   ---------------------------------------------------------
+
    Backend routes are mounted under /api.
 
    Examples:
-   /users              -> /api/users
-   /users?role=student -> /api/users?role=student
-   /courses            -> /api/courses
-   /api/users          -> /api/users
-   ========================================================= */
+
+   /users
+   -> /api/users
+
+   /users?role=student
+   -> /api/users?role=student
+
+   /courses
+   -> /api/courses
+
+   /api/users
+   -> /api/users
+========================================================= */
 
 function normalizeApiPath(path: string): string {
   const normalizedPath = normalizePath(path);
@@ -79,11 +87,12 @@ function normalizeApiPath(path: string): string {
     return normalizedPath;
   }
 
-  // Add /api to normal backend routes
+  // Root API route
   if (normalizedPath === "/") {
     return "/api/";
   }
 
+  // Add /api to normal backend routes
   return `/api${normalizedPath}`;
 }
 
@@ -152,8 +161,7 @@ async function apiFetch<T>(
     ===================================================== */
 
     if (!response.ok) {
-      let message =
-        `Request failed with status ${response.status}`;
+      let message = `Request failed with status ${response.status}`;
 
       if (
         typeof data === "object" &&

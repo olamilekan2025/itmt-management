@@ -1082,7 +1082,7 @@ export default function AuthPage() {
 
                 {/* ADMISSION APPLICATION */}
                 <Link
-                  href="/admissions/apply"
+                  href="/admission-form/apply"
                   className="group flex items-center justify-between rounded-2xl border border-brand-gold/20 bg-brand-gold/5 px-4 py-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-gold/40 hover:bg-brand-gold/10 hover:shadow-lg"
                 >
                   <div className="flex items-center gap-3">

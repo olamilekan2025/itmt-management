@@ -76,10 +76,10 @@ export default function HeroSection() {
 
 if (slides.length === 0) {
   return (
-    <section className="relative h-[640px] overflow-hidden bg-brand-navy md:h-[600px]">
+    <section className="relative h-[640px] overflow-hidden bg-brand-navy md:h-[655px]">
       {/* Background image */}
       <Image
-        src="/login.png"
+        src="/itmt-image-hero.jpg"
         alt="Institute of Transport and Management Technology"
         fill
         priority

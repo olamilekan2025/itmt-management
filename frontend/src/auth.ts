@@ -1,7 +1,9 @@
 import type { NextAuthOptions } from "next-auth";
+
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
+
 import { z } from "zod";
 
 import type { UserRole } from "./types/next-auth";
@@ -88,7 +90,7 @@ export const authOptions: NextAuthOptions = {
   providers: [
     /* ========================================================
        CREDENTIALS LOGIN
-       --------------------------------------------------------
+
        Student:
        matricNumber + password
 
@@ -126,7 +128,8 @@ export const authOptions: NextAuthOptions = {
            Validate credentials
         ------------------------------------------------------ */
 
-        const parsed = loginSchema.safeParse(credentials);
+        const parsed =
+          loginSchema.safeParse(credentials);
 
         if (!parsed.success) {
           console.error(
@@ -154,7 +157,9 @@ export const authOptions: NextAuthOptions = {
 
           if (matricNumber) {
             const normalizedMatricNumber =
-              matricNumber.trim().toUpperCase();
+              matricNumber
+                .trim()
+                .toUpperCase();
 
             console.log(
               "NextAuth: authenticating student:",
@@ -167,11 +172,13 @@ export const authOptions: NextAuthOptions = {
                 method: "POST",
 
                 headers: {
-                  "Content-Type": "application/json",
+                  "Content-Type":
+                    "application/json",
                 },
 
                 body: JSON.stringify({
-                  matricNumber: normalizedMatricNumber,
+                  matricNumber:
+                    normalizedMatricNumber,
                   password,
                 }),
 
@@ -192,7 +199,8 @@ export const authOptions: NextAuthOptions = {
               console.error(
                 "Student login failed:",
                 {
-                  status: response.status,
+                  status:
+                    response.status,
                   data,
                 },
               );
@@ -203,11 +211,23 @@ export const authOptions: NextAuthOptions = {
             console.log(
               "NEXTAUTH STUDENT LOGIN RESPONSE:",
               {
-                success: data?.success,
-                userId: data?.user?.id,
-                role: data?.user?.role,
+                success:
+                  data?.success,
+
+                userId:
+                  data?.user?.id,
+
+                role:
+                  data?.user?.role,
+
+                hasAccessToken:
+                  Boolean(data?.token),
               },
             );
+
+            /* ------------------------------------------------
+               Validate backend response
+            ------------------------------------------------ */
 
             if (
               !data?.user?.id ||
@@ -222,7 +242,15 @@ export const authOptions: NextAuthOptions = {
               return null;
             }
 
-            if (!isValidRole(data.user.role)) {
+            /* ------------------------------------------------
+               Validate role
+            ------------------------------------------------ */
+
+            if (
+              !isValidRole(
+                data.user.role,
+              )
+            ) {
               console.error(
                 "Invalid student role:",
                 data.user.role,
@@ -231,23 +259,33 @@ export const authOptions: NextAuthOptions = {
               return null;
             }
 
+            /* ------------------------------------------------
+               Return normalized NextAuth user
+            ------------------------------------------------ */
+
             return {
-              id: String(data.user.id),
+              id: String(
+                data.user.id,
+              ),
 
               name:
                 data.user.name ||
                 normalizedMatricNumber,
 
               email:
-                data.user.email || null,
+                data.user.email ||
+                null,
 
-              role: data.user.role,
+              role:
+                data.user.role,
 
               matricNumber:
-                data.user.matricNumber ||
+                data.user
+                  .matricNumber ||
                 normalizedMatricNumber,
 
-              accessToken: String(data.token),
+              accessToken:
+                String(data.token),
             };
           }
 
@@ -258,9 +296,12 @@ export const authOptions: NextAuthOptions = {
 
           if (email) {
             const normalizedEmail =
-              email.trim().toLowerCase();
+              email
+                .trim()
+                .toLowerCase();
 
-            const normalizedOtp = otp?.trim();
+            const normalizedOtp =
+              otp?.trim();
 
             console.log(
               "NextAuth: authenticating staff:",
@@ -269,7 +310,9 @@ export const authOptions: NextAuthOptions = {
 
             console.log(
               "NextAuth: OTP supplied:",
-              normalizedOtp ? "YES" : "NO",
+              normalizedOtp
+                ? "YES"
+                : "NO",
             );
 
             const response = await fetch(
@@ -278,16 +321,20 @@ export const authOptions: NextAuthOptions = {
                 method: "POST",
 
                 headers: {
-                  "Content-Type": "application/json",
+                  "Content-Type":
+                    "application/json",
                 },
 
                 body: JSON.stringify({
-                  email: normalizedEmail,
+                  email:
+                    normalizedEmail,
+
                   password,
 
                   ...(normalizedOtp
                     ? {
-                        otp: normalizedOtp,
+                        otp:
+                          normalizedOtp,
                       }
                     : {}),
                 }),
@@ -309,7 +356,8 @@ export const authOptions: NextAuthOptions = {
               console.error(
                 "Staff login failed:",
                 {
-                  status: response.status,
+                  status:
+                    response.status,
                   data,
                 },
               );
@@ -320,12 +368,26 @@ export const authOptions: NextAuthOptions = {
             console.log(
               "NEXTAUTH STAFF LOGIN RESPONSE:",
               {
-                success: data?.success,
-                userId: data?.user?.id,
-                role: data?.user?.role,
-                email: data?.user?.email,
+                success:
+                  data?.success,
+
+                userId:
+                  data?.user?.id,
+
+                role:
+                  data?.user?.role,
+
+                email:
+                  data?.user?.email,
+
+                hasAccessToken:
+                  Boolean(data?.token),
               },
             );
+
+            /* ------------------------------------------------
+               Validate backend response
+            ------------------------------------------------ */
 
             if (
               !data?.user?.id ||
@@ -340,7 +402,15 @@ export const authOptions: NextAuthOptions = {
               return null;
             }
 
-            if (!isValidRole(data.user.role)) {
+            /* ------------------------------------------------
+               Validate role
+            ------------------------------------------------ */
+
+            if (
+              !isValidRole(
+                data.user.role,
+              )
+            ) {
               console.error(
                 "Invalid staff role:",
                 data.user.role,
@@ -349,8 +419,14 @@ export const authOptions: NextAuthOptions = {
               return null;
             }
 
+            /* ------------------------------------------------
+               Return normalized NextAuth user
+            ------------------------------------------------ */
+
             return {
-              id: String(data.user.id),
+              id: String(
+                data.user.id,
+              ),
 
               name:
                 data.user.name ||
@@ -360,9 +436,11 @@ export const authOptions: NextAuthOptions = {
                 data.user.email ||
                 normalizedEmail,
 
-              role: data.user.role,
+              role:
+                data.user.role,
 
-              accessToken: String(data.token),
+              accessToken:
+                String(data.token),
             };
           }
 
@@ -386,14 +464,17 @@ export const authOptions: NextAuthOptions = {
       },
     }),
 
-       /* ========================================================
+    /* ========================================================
        GOOGLE
     ======================================================== */
 
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientId:
+        process.env.GOOGLE_CLIENT_ID || "",
+
       clientSecret:
         process.env.GOOGLE_CLIENT_SECRET || "",
+
       authorization: {
         params: {
           prompt: "select_account",
@@ -424,25 +505,27 @@ export const authOptions: NextAuthOptions = {
     /* ========================================================
        SIGN-IN CALLBACK
 
-       Google/Facebook authentication first happens with
-       NextAuth's provider.
+       Credentials:
+       authorize() handles the backend login.
 
-       After that, we exchange the provider identity with
-       the ITMT backend.
-
-       The backend returns:
-       - user
-       - role
-       - JWT token
+       Google/Facebook:
+       NextAuth authenticates the provider first, then we
+       exchange the provider identity with the ITMT backend.
     ======================================================== */
 
-    async signIn({ user, account }) {
+    async signIn({
+      user,
+      account,
+    }) {
       /* ------------------------------------------------------
-         Credentials authentication is already completed inside
-         authorize().
+         Credentials authentication has already been completed
+         inside authorize().
       ------------------------------------------------------ */
 
-      if (account?.provider === "credentials") {
+      if (
+        account?.provider ===
+        "credentials"
+      ) {
         return true;
       }
 
@@ -451,8 +534,10 @@ export const authOptions: NextAuthOptions = {
       ------------------------------------------------------ */
 
       if (
-        account?.provider !== "google" &&
-        account?.provider !== "facebook"
+        account?.provider !==
+          "google" &&
+        account?.provider !==
+          "facebook"
       ) {
         return true;
       }
@@ -470,16 +555,20 @@ export const authOptions: NextAuthOptions = {
       }
 
       try {
-        const apiUrl = getApiUrl();
+        const apiUrl =
+          getApiUrl();
 
-        const email = user.email
-          .trim()
-          .toLowerCase();
+        const email =
+          user.email
+            .trim()
+            .toLowerCase();
 
         console.log(
           "NextAuth OAuth sign-in:",
           {
-            provider: account.provider,
+            provider:
+              account.provider,
+
             email,
           },
         );
@@ -488,32 +577,38 @@ export const authOptions: NextAuthOptions = {
            EXCHANGE OAUTH IDENTITY WITH ITMT BACKEND
         ================================================== */
 
-        const response = await fetch(
-          `${apiUrl}/api/auth/oauth-login`,
-          {
-            method: "POST",
+        const response =
+          await fetch(
+            `${apiUrl}/api/auth/oauth-login`,
+            {
+              method: "POST",
 
-            headers: {
-              "Content-Type": "application/json",
-            },
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
 
-            body: JSON.stringify({
-              email,
-
-              name:
-                user.name ||
+              body: JSON.stringify({
                 email,
 
-              provider: account.provider,
-            }),
+                name:
+                  user.name ||
+                  email,
 
-            cache: "no-store",
-          },
-        );
+                provider:
+                  account.provider,
+              }),
 
-        const data = await response
-          .json()
-          .catch(() => null);
+              cache: "no-store",
+            },
+          );
+
+        const data =
+          await response
+            .json()
+            .catch(
+              () => null,
+            );
 
         console.log(
           "NextAuth OAuth backend status:",
@@ -528,7 +623,9 @@ export const authOptions: NextAuthOptions = {
           console.error(
             "OAuth backend login failed:",
             {
-              status: response.status,
+              status:
+                response.status,
+
               data,
             },
           );
@@ -557,7 +654,11 @@ export const authOptions: NextAuthOptions = {
            Validate role
         ---------------------------------------------------- */
 
-        if (!isValidRole(data.user.role)) {
+        if (
+          !isValidRole(
+            data.user.role,
+          )
+        ) {
           console.error(
             "OAuth backend returned invalid role:",
             data.user.role,
@@ -569,43 +670,63 @@ export const authOptions: NextAuthOptions = {
         /* ==================================================
            STORE BACKEND DATA ON NEXTAUTH USER
 
-           The JWT callback will transfer these values into
-           the NextAuth JWT.
+           The JWT callback will move these values into the
+           NextAuth JWT.
         ================================================== */
 
-        user.id = String(data.user.id);
+        user.id =
+          String(data.user.id);
 
-        user.role = data.user.role;
+        user.role =
+          data.user.role;
 
-        user.accessToken = String(data.token);
+        user.accessToken =
+          String(data.token);
 
-        if (data.user.matricNumber) {
-          user.matricNumber = String(
-            data.user.matricNumber,
-          );
+        if (
+          data.user.matricNumber
+        ) {
+          user.matricNumber =
+            String(
+              data.user
+                .matricNumber,
+            );
         }
 
         /* ----------------------------------------------------
-           Make sure the backend name/email are reflected.
+           Update name/email from backend when available.
         ---------------------------------------------------- */
 
         if (data.user.name) {
-          user.name = String(data.user.name);
+          user.name =
+            String(
+              data.user.name,
+            );
         }
 
         if (data.user.email) {
-          user.email = String(data.user.email);
+          user.email =
+            String(
+              data.user.email,
+            );
         }
 
         console.log(
           "NextAuth OAuth backend exchange successful:",
           {
-            provider: account.provider,
-            userId: user.id,
-            role: user.role,
-            hasAccessToken: Boolean(
-              user.accessToken,
-            ),
+            provider:
+              account.provider,
+
+            userId:
+              user.id,
+
+            role:
+              user.role,
+
+            hasAccessToken:
+              Boolean(
+                user.accessToken,
+              ),
           },
         );
 
@@ -632,50 +753,92 @@ export const authOptions: NextAuthOptions = {
       console.log(
         "NEXTAUTH JWT CALLBACK:",
         {
-          provider: account?.provider,
-          userId: user?.id,
-          role: user?.role,
+          provider:
+            account?.provider,
+
+          userId:
+            user?.id,
+
+          role:
+            user?.role,
+
+          hasUserAccessToken:
+            Boolean(
+              user?.accessToken,
+            ),
+
+          hasTokenAccessToken:
+            Boolean(
+              token.accessToken,
+            ),
         },
       );
 
       /* ======================================================
-         CREDENTIALS LOGIN
+         INITIAL CREDENTIALS LOGIN
       ====================================================== */
 
       if (
         user &&
-        account?.provider === "credentials"
+        account?.provider ===
+          "credentials"
       ) {
-        token.id = user.id;
+        token.id =
+          String(user.id);
 
         token.role =
           user.role as UserRole;
 
         token.accessToken =
-          user.accessToken;
+          String(
+            user.accessToken,
+          );
 
         if (user.matricNumber) {
           token.matricNumber =
-            user.matricNumber;
+            String(
+              user.matricNumber,
+            );
         }
+
+        console.log(
+          "NEXTAUTH CREDENTIALS JWT STORED:",
+          {
+            userId:
+              token.id,
+
+            role:
+              token.role,
+
+            hasAccessToken:
+              Boolean(
+                token.accessToken,
+              ),
+
+            hasMatricNumber:
+              Boolean(
+                token.matricNumber,
+              ),
+          },
+        );
 
         return token;
       }
 
       /* ======================================================
-         GOOGLE / FACEBOOK LOGIN
+         INITIAL GOOGLE / FACEBOOK LOGIN
 
          signIn() has already exchanged the provider identity
-         with the backend.
-
-         We only transfer the backend information here.
+         with the ITMT backend.
       ====================================================== */
 
       if (
         user &&
         (
-          account?.provider === "google" ||
-          account?.provider === "facebook"
+          account?.provider ===
+            "google" ||
+          account?.provider ===
+            "facebook"
         )
       ) {
         if (
@@ -683,37 +846,89 @@ export const authOptions: NextAuthOptions = {
           user.role &&
           user.accessToken
         ) {
-          token.id = String(user.id);
+          token.id =
+            String(user.id);
 
           token.role =
             user.role as UserRole;
 
           token.accessToken =
-            String(user.accessToken);
+            String(
+              user.accessToken,
+            );
 
-          if (user.matricNumber) {
+          if (
+            user.matricNumber
+          ) {
             token.matricNumber =
-              String(user.matricNumber);
+              String(
+                user.matricNumber,
+              );
           }
+
+          console.log(
+            "NEXTAUTH OAUTH JWT STORED:",
+            {
+              userId:
+                token.id,
+
+              role:
+                token.role,
+
+              hasAccessToken:
+                Boolean(
+                  token.accessToken,
+                ),
+
+              hasMatricNumber:
+                Boolean(
+                  token.matricNumber,
+                ),
+            },
+          );
         } else {
           console.error(
             "OAuth JWT could not be populated:",
             {
-              hasUserId: Boolean(user.id),
-              hasRole: Boolean(user.role),
-              hasAccessToken: Boolean(
-                user.accessToken,
-              ),
+              hasUserId:
+                Boolean(user.id),
+
+              hasRole:
+                Boolean(user.role),
+
+              hasAccessToken:
+                Boolean(
+                  user.accessToken,
+                ),
             },
           );
         }
       }
+
+      /* ------------------------------------------------------
+         IMPORTANT:
+
+         On later JWT callback executions, NextAuth may not
+         provide "user". In that situation we DO NOT overwrite
+         the existing token values.
+
+         This allows the backend JWT to persist.
+      ------------------------------------------------------ */
 
       return token;
     },
 
     /* ========================================================
        SESSION CALLBACK
+
+       This is the important fix for the registration page.
+
+       Backend JWT is exposed in BOTH locations:
+
+       session.accessToken
+       session.user.accessToken
+
+       Existing pages using either location will work.
     ======================================================== */
 
     async session({
@@ -723,11 +938,16 @@ export const authOptions: NextAuthOptions = {
       console.log(
         "NEXTAUTH SESSION CALLBACK:",
         {
-          tokenId: token.id,
-          role: token.role,
-          hasAccessToken: Boolean(
-            token.accessToken,
-          ),
+          tokenId:
+            token.id,
+
+          role:
+            token.role,
+
+          hasAccessToken:
+            Boolean(
+              token.accessToken,
+            ),
         },
       );
 
@@ -735,26 +955,30 @@ export const authOptions: NextAuthOptions = {
          User ID
       ------------------------------------------------------ */
 
-      session.user.id = String(
-        token.id ||
-          token.sub ||
-          "",
-      );
+      session.user.id =
+        String(
+          token.id ||
+            token.sub ||
+            "",
+        );
 
       /* ------------------------------------------------------
          Role
       ------------------------------------------------------ */
 
-      if (isValidRole(token.role)) {
+      if (
+        isValidRole(
+          token.role,
+        )
+      ) {
         session.user.role =
           token.role;
       } else {
         /*
-         * Do not allow an invalid role to reach the dashboard.
+         * This should normally never happen because the backend
+         * validates the role before authentication succeeds.
          *
-         * Student is used only as a type-safe fallback.
-         * A properly authenticated backend user should always
-         * have a valid role.
+         * Student remains the existing type-safe fallback.
          */
 
         session.user.role =
@@ -765,25 +989,94 @@ export const authOptions: NextAuthOptions = {
          Matric Number
       ------------------------------------------------------ */
 
-      if (token.matricNumber) {
+      if (
+        token.matricNumber
+      ) {
         session.user.matricNumber =
           String(
             token.matricNumber,
           );
       } else {
-        delete session.user.matricNumber;
+        delete session.user
+          .matricNumber;
       }
 
-      /* ------------------------------------------------------
-         Backend JWT
-      ------------------------------------------------------ */
+      /* ======================================================
+         BACKEND JWT
 
-      if (token.accessToken) {
-        session.accessToken =
+         IMPORTANT FIX:
+
+         Previously this was only:
+
+             session.accessToken
+
+         But your student registration page reads:
+
+             session.user.accessToken
+
+         Therefore the token must be exposed on BOTH.
+      ====================================================== */
+
+      if (
+        token.accessToken
+      ) {
+        const accessToken =
           String(
             token.accessToken,
           );
+
+        /* ----------------------------------------------------
+           Primary location used by your student pages
+        ---------------------------------------------------- */
+
+        session.user.accessToken =
+          accessToken;
+
+        /* ----------------------------------------------------
+           Keep the existing location for compatibility with
+           other dashboards/pages.
+        ---------------------------------------------------- */
+
+        session.accessToken =
+          accessToken;
+      } else {
+        /*
+         * Do not leave stale token values in the session.
+         */
+
+        delete session.user
+          .accessToken;
+
+        delete session.accessToken;
       }
+
+      console.log(
+        "NEXTAUTH SESSION READY:",
+        {
+          userId:
+            session.user.id,
+
+          role:
+            session.user.role,
+
+          hasUserAccessToken:
+            Boolean(
+              session.user
+                .accessToken,
+            ),
+
+          hasSessionAccessToken:
+            Boolean(
+              session.accessToken,
+            ),
+
+          hasMatricNumber:
+            Boolean(
+              session.user
+                .matricNumber,
+            ),
+        },
+      );
 
       return session;
     },
@@ -793,13 +1086,13 @@ export const authOptions: NextAuthOptions = {
 
        OAuth provider:
        Google/Facebook
-            ↓
+             ↓
        NextAuth callback
-            ↓
+             ↓
        Backend OAuth exchange
-            ↓
+             ↓
        /auth/oauth-success
-            ↓
+             ↓
        Role dashboard
     ======================================================== */
 
@@ -831,7 +1124,9 @@ export const authOptions: NextAuthOptions = {
          Allow internal relative URLs.
       ------------------------------------------------------ */
 
-      if (url.startsWith("/")) {
+      if (
+        url.startsWith("/")
+      ) {
         return `${baseUrl}${url}`;
       }
 
@@ -880,7 +1175,8 @@ export const authOptions: NextAuthOptions = {
   ========================================================== */
 
   debug:
-    process.env.NODE_ENV === "development",
+    process.env.NODE_ENV ===
+    "development",
 
   /* ==========================================================
      SECRET
@@ -889,4 +1185,3 @@ export const authOptions: NextAuthOptions = {
   secret:
     process.env.NEXTAUTH_SECRET,
 };
-
