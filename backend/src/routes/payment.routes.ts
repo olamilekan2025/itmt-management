@@ -3,12 +3,16 @@ import { Router } from "express";
 import {
   getFinanceDashboard,
   getMyBalance,
+  getMyPaymentReceipt,
   getMyPayments,
   getPaymentById,
   getPayments,
   getStudentBalance,
   getStudentsFees,
+  initializePaystackPayment,
+  paystackWebhook,
   recordPayment,
+  verifyPaystackPayment,
   verifyPayment,
 } from "../controllers/payment.controller.js";
 
@@ -19,65 +23,105 @@ import {
 
 const router = Router();
 
-/**
- * Finance/Admin
- * Record a payment
- */
+/* =========================================================
+   PAYSTACK WEBHOOK
+
+   IMPORTANT:
+   - Public route
+   - DO NOT add authenticate()
+   - Paystack authenticates using x-paystack-signature
+========================================================= */
+
+router.post(
+  "/paystack/webhook",
+  paystackWebhook,
+);
+
+/* =========================================================
+   PAYSTACK STUDENT PAYMENT
+
+   These MUST appear before /:id routes.
+========================================================= */
+
+router.post(
+  "/paystack/initialize",
+  authenticate,
+  authorize("student"),
+  initializePaystackPayment,
+);
+
+router.post(
+  "/paystack/verify",
+  authenticate,
+  authorize("student"),
+  verifyPaystackPayment,
+);
+
+router.get(
+  "/paystack/receipt/:reference",
+  authenticate,
+  authorize("student"),
+  getMyPaymentReceipt,
+);
+
+/* =========================================================
+   FINANCE / ADMIN
+========================================================= */
+
 router.post(
   "/",
   authenticate,
-  authorize("finance", "admin"),
+  authorize(
+    "finance",
+    "admin",
+  ),
   recordPayment,
 );
 
-/**
- * Finance/Admin
- * Get payment records with filtering and pagination
- */
 router.get(
   "/",
   authenticate,
-  authorize("finance", "admin"),
+  authorize(
+    "finance",
+    "admin",
+  ),
   getPayments,
 );
 
-/**
- * Finance/Admin
- * Finance dashboard summary
- */
 router.get(
   "/dashboard",
   authenticate,
-  authorize("finance", "admin"),
+  authorize(
+    "finance",
+    "admin",
+  ),
   getFinanceDashboard,
 );
 
-/**
- * Finance/Admin
- * Get all students with their fee/payment status
- */
 router.get(
   "/students-fees",
   authenticate,
-  authorize("finance", "admin"),
+  authorize(
+    "finance",
+    "admin",
+  ),
   getStudentsFees,
 );
 
-/**
- * Finance/Admin
- * Get a specific student's balance
- */
 router.get(
   "/balance",
   authenticate,
-  authorize("finance", "admin"),
+  authorize(
+    "finance",
+    "admin",
+  ),
   getStudentBalance,
 );
 
-/**
- * Student
- * Get own payment history
- */
+/* =========================================================
+   STUDENT
+========================================================= */
+
 router.get(
   "/me",
   authenticate,
@@ -85,10 +129,6 @@ router.get(
   getMyPayments,
 );
 
-/**
- * Student
- * Get own balance
- */
 router.get(
   "/me/balance",
   authenticate,
@@ -96,26 +136,30 @@ router.get(
   getMyBalance,
 );
 
-/**
- * Finance/Admin
- * Get a specific payment by ID
- * ⚠️ MUST stay after all static routes above — this catches everything else
- */
+/* =========================================================
+   PAYMENT DETAILS / MANUAL VERIFICATION
+
+   IMPORTANT:
+   Keep /:id LAST.
+========================================================= */
+
 router.get(
   "/:id",
   authenticate,
-  authorize("finance", "admin"),
+  authorize(
+    "finance",
+    "admin",
+  ),
   getPaymentById,
 );
 
-/**
- * Finance/Admin
- * Verify a payment
- */
 router.post(
   "/:id/verify",
   authenticate,
-  authorize("finance", "admin"),
+  authorize(
+    "finance",
+    "admin",
+  ),
   verifyPayment,
 );
 

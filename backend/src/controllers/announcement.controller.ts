@@ -1,12 +1,8 @@
-import type {
-  Response,
-} from "express";
+import type { Response } from "express";
 
 import { z } from "zod";
 
-import type {
-  AuthRequest,
-} from "../middleware/auth.middleware.js";
+import type { AuthRequest } from "../middleware/auth.middleware.js";
 
 import Announcement from "../models/Announcement.js";
 
@@ -26,127 +22,164 @@ const objectId = z
     "Invalid ID",
   );
 
-const createAnnouncementSchema =
-  z.object({
-    title: z
-      .string()
-      .trim()
-      .min(
-        3,
-        "Title must be at least 3 characters",
-      )
-      .max(
-        200,
-        "Title cannot exceed 200 characters",
-      ),
+const createAnnouncementSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(
+      3,
+      "Title must be at least 3 characters",
+    )
+    .max(
+      200,
+      "Title cannot exceed 200 characters",
+    ),
 
-    content: z
-      .string()
-      .trim()
-      .min(
-        1,
-        "Announcement content is required",
-      )
-      .max(
-        10000,
-        "Content cannot exceed 10000 characters",
-      ),
+  content: z
+    .string()
+    .trim()
+    .min(
+      1,
+      "Announcement content is required",
+    )
+    .max(
+      10000,
+      "Content cannot exceed 10000 characters",
+    ),
 
-    audience: z
-      .enum([
-        "everyone",
-        "students",
-        "lecturers",
-        "staff",
-        "finance",
-      ])
-      .default("everyone"),
+  audience: z
+    .enum([
+      "everyone",
+      "students",
+      "lecturers",
+      "staff",
+      "finance",
+    ])
+    .default("everyone"),
 
-    status: z
-      .enum([
-        "draft",
-        "published",
-        "archived",
-      ])
-      .default("draft"),
-  });
+  status: z
+    .enum([
+      "draft",
+      "published",
+      "archived",
+    ])
+    .default("draft"),
+});
 
-const updateAnnouncementSchema =
-  z.object({
-    title: z
-      .string()
-      .trim()
-      .min(
-        3,
-        "Title must be at least 3 characters",
-      )
-      .max(
-        200,
-        "Title cannot exceed 200 characters",
-      )
-      .optional(),
+const updateAnnouncementSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(
+      3,
+      "Title must be at least 3 characters",
+    )
+    .max(
+      200,
+      "Title cannot exceed 200 characters",
+    )
+    .optional(),
 
-    content: z
-      .string()
-      .trim()
-      .min(
-        1,
-        "Announcement content is required",
-      )
-      .max(
-        10000,
-        "Content cannot exceed 10000 characters",
-      )
-      .optional(),
+  content: z
+    .string()
+    .trim()
+    .min(
+      1,
+      "Announcement content is required",
+    )
+    .max(
+      10000,
+      "Content cannot exceed 10000 characters",
+    )
+    .optional(),
 
-    audience: z
-      .enum([
-        "everyone",
-        "students",
-        "lecturers",
-        "staff",
-        "finance",
-      ])
-      .optional(),
+  audience: z
+    .enum([
+      "everyone",
+      "students",
+      "lecturers",
+      "staff",
+      "finance",
+    ])
+    .optional(),
 
-    status: z
-      .enum([
-        "draft",
-        "published",
-        "archived",
-      ])
-      .optional(),
-  });
+  status: z
+    .enum([
+      "draft",
+      "published",
+      "archived",
+    ])
+    .optional(),
+});
 
-const announcementQuerySchema =
-  z.object({
-    status: z
-      .enum([
-        "draft",
-        "published",
-        "archived",
-      ])
-      .optional(),
+const announcementQuerySchema = z.object({
+  status: z
+    .enum([
+      "draft",
+      "published",
+      "archived",
+    ])
+    .optional(),
 
-    audience: z
-      .enum([
-        "everyone",
-        "students",
-        "lecturers",
-        "staff",
-        "finance",
-      ])
-      .optional(),
+  audience: z
+    .enum([
+      "everyone",
+      "students",
+      "lecturers",
+      "staff",
+      "finance",
+    ])
+    .optional(),
 
-    search: z
-      .string()
-      .trim()
-      .max(
-        200,
-        "Search cannot exceed 200 characters",
-      )
-      .optional(),
-  });
+  search: z
+    .string()
+    .trim()
+    .max(
+      200,
+      "Search cannot exceed 200 characters",
+    )
+    .optional(),
+});
+
+/* =========================================================
+   TYPES
+========================================================= */
+
+type AnnouncementAudience =
+  | "everyone"
+  | "students"
+  | "lecturers"
+  | "staff"
+  | "finance";
+
+type AnnouncementStatus =
+  | "draft"
+  | "published"
+  | "archived";
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+/**
+ * Escape user input before using it inside MongoDB regex.
+ *
+ * This prevents search terms such as:
+ *   .* 
+ *   $
+ *   []
+ *   ()
+ *
+ * from being interpreted as regex operators.
+ */
+function escapeRegex(
+  value: string,
+): string {
+  return value.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    "\\$&",
+  );
+}
 
 /* =========================================================
    AUDIENCE HELPERS
@@ -171,17 +204,28 @@ function isVisibleToLecturers(
   ].includes(audience);
 }
 
+function isVisibleToStudents(
+  audience: string,
+): boolean {
+  return [
+    "everyone",
+    "students",
+  ].includes(audience);
+}
+
 /* =========================================================
    NOTIFY FINANCE
 ========================================================= */
 
 async function notifyFinanceIfNeeded(
-  audience: string,
+  audience: AnnouncementAudience,
   title: string,
   announcementId: string,
 ) {
   if (
-    !isVisibleToFinance(audience)
+    !isVisibleToFinance(
+      audience,
+    )
   ) {
     return;
   }
@@ -191,12 +235,16 @@ async function notifyFinanceIfNeeded(
     {
       title:
         "New Announcement",
+
       message:
         `"${title}" has been published.`,
+
       type:
         "announcement",
+
       link:
         "/dashboards/finance/announcements",
+
       metadata: {
         announcementId,
       },
@@ -209,7 +257,7 @@ async function notifyFinanceIfNeeded(
 ========================================================= */
 
 async function notifyLecturersIfNeeded(
-  audience: string,
+  audience: AnnouncementAudience,
   title: string,
   announcementId: string,
 ) {
@@ -226,17 +274,154 @@ async function notifyLecturersIfNeeded(
     {
       title:
         "New Announcement",
+
       message:
         `"${title}" has been published.`,
+
       type:
         "announcement",
+
       link:
         "/dashboards/lecturer/announcements",
+
       metadata: {
         announcementId,
       },
     },
   );
+}
+
+/* =========================================================
+   NOTIFY STUDENTS
+========================================================= */
+
+async function notifyStudentsIfNeeded(
+  audience: AnnouncementAudience,
+  title: string,
+  announcementId: string,
+) {
+  if (
+    !isVisibleToStudents(
+      audience,
+    )
+  ) {
+    return;
+  }
+
+  await notifyByRole(
+    "student",
+    {
+      title:
+        "New Announcement",
+
+      message:
+        `"${title}" has been published.`,
+
+      type:
+        "announcement",
+
+      link:
+        `/dashboards/student/announcements?announcement=${encodeURIComponent(
+          announcementId,
+        )}`,
+
+      metadata: {
+        announcementId,
+      },
+    },
+  );
+}
+
+/* =========================================================
+   NOTIFY ALL RELEVANT USERS
+========================================================= */
+
+/**
+ * Sends notifications to all relevant roles.
+ *
+ * Promise.allSettled is intentionally used here.
+ *
+ * If notification creation fails, the announcement itself
+ * must still be successfully created/published.
+ */
+async function notifyAnnouncementPublished(
+  announcement: {
+    _id: unknown;
+    title: string;
+    audience: AnnouncementAudience;
+  },
+) {
+  const announcementId =
+    String(announcement._id);
+
+  const results =
+    await Promise.allSettled([
+      /* ---------------------------------------------------
+         ADMIN
+      --------------------------------------------------- */
+
+      notifyAdmins({
+        title:
+          "Announcement Published",
+
+        message:
+          `"${announcement.title}" has been published.`,
+
+        type:
+          "announcement",
+
+        link:
+          "/dashboards/admin/announcements",
+
+        metadata: {
+          announcementId,
+        },
+      }),
+
+      /* ---------------------------------------------------
+         FINANCE
+      --------------------------------------------------- */
+
+      notifyFinanceIfNeeded(
+        announcement.audience,
+        announcement.title,
+        announcementId,
+      ),
+
+      /* ---------------------------------------------------
+         LECTURERS
+      --------------------------------------------------- */
+
+      notifyLecturersIfNeeded(
+        announcement.audience,
+        announcement.title,
+        announcementId,
+      ),
+
+      /* ---------------------------------------------------
+         STUDENTS
+      --------------------------------------------------- */
+
+      notifyStudentsIfNeeded(
+        announcement.audience,
+        announcement.title,
+        announcementId,
+      ),
+    ]);
+
+  for (
+    const result of results
+  ) {
+    if (
+      result.status ===
+      "rejected"
+    ) {
+      console.error(
+        "Announcement notification error:",
+        result.reason,
+      );
+    }
+  }
 }
 
 /* =========================================================
@@ -252,19 +437,19 @@ export async function getAllAnnouncements(
       announcementQuerySchema.safeParse({
         status:
           typeof req.query.status ===
-            "string"
+          "string"
             ? req.query.status
             : undefined,
 
         audience:
           typeof req.query.audience ===
-            "string"
+          "string"
             ? req.query.audience
             : undefined,
 
         search:
           typeof req.query.search ===
-            "string"
+          "string"
             ? req.query.search
             : undefined,
       });
@@ -272,8 +457,10 @@ export async function getAllAnnouncements(
     if (!parsed.success) {
       return res.status(400).json({
         success: false,
+
         message:
           "Invalid announcement filters",
+
         errors:
           parsed.error.flatten()
             .fieldErrors,
@@ -289,12 +476,14 @@ export async function getAllAnnouncements(
     const role =
       req.user?.role;
 
-    const filter:
-      Record<string, unknown> = {};
+    const filter: Record<
+      string,
+      unknown
+    > = {};
 
     /* =====================================================
        FINANCE
-    ====================================================== */
+    ===================================================== */
 
     if (
       role === "finance"
@@ -313,22 +502,11 @@ export async function getAllAnnouncements(
 
     /* =====================================================
        LECTURER
-    ====================================================== */
+    ===================================================== */
 
     else if (
       role === "lecturer"
     ) {
-      /*
-       * These values are deliberately forced.
-       *
-       * A lecturer cannot bypass this by requesting:
-       *
-       * ?status=draft
-       * ?audience=finance
-       *
-       * because their role determines the filter.
-       */
-
       filter.status =
         "published";
 
@@ -341,8 +519,36 @@ export async function getAllAnnouncements(
     }
 
     /* =====================================================
+       STUDENT
+    ===================================================== */
+
+    else if (
+      role === "student"
+    ) {
+      /*
+       * Students can ONLY receive:
+       *
+       * - published announcements
+       * - everyone
+       * - students
+       *
+       * Query parameters cannot override this restriction.
+       */
+
+      filter.status =
+        "published";
+
+      filter.audience = {
+        $in: [
+          "everyone",
+          "students",
+        ],
+      };
+    }
+
+    /* =====================================================
        ADMIN / REGISTRAR
-    ====================================================== */
+    ===================================================== */
 
     else {
       if (status) {
@@ -358,19 +564,25 @@ export async function getAllAnnouncements(
 
     /* =====================================================
        SEARCH
-    ====================================================== */
+    ===================================================== */
 
     if (search) {
+      const safeSearch =
+        escapeRegex(search);
+
       filter.$or = [
         {
           title: {
-            $regex: search,
+            $regex:
+              safeSearch,
             $options: "i",
           },
         },
+
         {
           content: {
-            $regex: search,
+            $regex:
+              safeSearch,
             $options: "i",
           },
         },
@@ -448,7 +660,7 @@ export async function getAnnouncementById(
 
     /* =====================================================
        FINANCE SECURITY
-    ====================================================== */
+    ===================================================== */
 
     if (
       req.user?.role ===
@@ -456,7 +668,7 @@ export async function getAnnouncementById(
     ) {
       const canView =
         announcement.status ===
-        "published" &&
+          "published" &&
         isVisibleToFinance(
           announcement.audience,
         );
@@ -472,7 +684,7 @@ export async function getAnnouncementById(
 
     /* =====================================================
        LECTURER SECURITY
-    ====================================================== */
+    ===================================================== */
 
     if (
       req.user?.role ===
@@ -480,7 +692,7 @@ export async function getAnnouncementById(
     ) {
       const canView =
         announcement.status ===
-        "published" &&
+          "published" &&
         isVisibleToLecturers(
           announcement.audience,
         );
@@ -493,6 +705,35 @@ export async function getAnnouncementById(
         });
       }
     }
+
+    /* =====================================================
+       STUDENT SECURITY
+    ===================================================== */
+
+    if (
+      req.user?.role ===
+      "student"
+    ) {
+      const canView =
+        announcement.status ===
+          "published" &&
+        isVisibleToStudents(
+          announcement.audience,
+        );
+
+      if (!canView) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You are not authorized to view this announcement",
+        });
+      }
+    }
+
+    /*
+     * Admin and registrar are intentionally not restricted
+     * here because they manage announcements.
+     */
 
     return res.status(200).json({
       success: true,
@@ -545,7 +786,7 @@ export async function createAnnouncement(
 
         publishedAt:
           data.status ===
-            "published"
+          "published"
             ? new Date()
             : undefined,
       });
@@ -556,59 +797,33 @@ export async function createAnnouncement(
     );
 
     /* =====================================================
-       NOTIFY WHEN IMMEDIATELY PUBLISHED
-    ====================================================== */
+       NOTIFY IF CREATED DIRECTLY AS PUBLISHED
+    ===================================================== */
 
     if (
       data.status ===
       "published"
     ) {
-      const announcementId =
-        announcement._id.toString();
+      await notifyAnnouncementPublished(
+        {
+          _id:
+            announcement._id,
 
-      /* ---------------------------------------------------
-         ADMIN
-      --------------------------------------------------- */
+          title:
+            announcement.title,
 
-      await notifyAdmins({
-        title:
-          "New Announcement Published",
-        message:
-          `"${data.title}" has been published.`,
-        type:
-          "announcement",
-        link:
-          "/dashboards/admin/announcements",
-        metadata: {
-          announcementId,
+          audience:
+            announcement.audience as AnnouncementAudience,
         },
-      });
-
-      /* ---------------------------------------------------
-         FINANCE
-      --------------------------------------------------- */
-
-      await notifyFinanceIfNeeded(
-        data.audience,
-        data.title,
-        announcementId,
-      );
-
-      /* ---------------------------------------------------
-         LECTURERS
-      --------------------------------------------------- */
-
-      await notifyLecturersIfNeeded(
-        data.audience,
-        data.title,
-        announcementId,
       );
     }
 
     return res.status(201).json({
       success: true,
+
       message:
         "Announcement created successfully",
+
       announcement,
     });
   } catch (error) {
@@ -618,8 +833,10 @@ export async function createAnnouncement(
     ) {
       return res.status(400).json({
         success: false,
+
         message:
           "Validation failed",
+
         errors:
           error.flatten()
             .fieldErrors,
@@ -633,6 +850,7 @@ export async function createAnnouncement(
 
     return res.status(500).json({
       success: false,
+
       message:
         "Unable to create announcement",
     });
@@ -657,6 +875,7 @@ export async function updateAnnouncement(
     ) {
       return res.status(400).json({
         success: false,
+
         message:
           "Invalid announcement ID",
       });
@@ -675,6 +894,7 @@ export async function updateAnnouncement(
     if (!existing) {
       return res.status(404).json({
         success: false,
+
         message:
           "Announcement not found",
       });
@@ -684,36 +904,28 @@ export async function updateAnnouncement(
       existing.status ===
       "published";
 
-    /*
-     * We only send a "published" notification when
-     * the announcement changes from a non-published
-     * state to published.
-     *
-     * Editing an already-published announcement
-     * will NOT send another notification.
-     */
+    const nextStatus =
+      data.status ??
+      existing.status;
 
     const willBePublished =
-      data.status ===
-      "published" ||
-      (
-        data.status ===
-        undefined &&
-        wasPublished
-      );
+      nextStatus ===
+      "published";
 
-    const updateData:
-      Record<string, unknown> = {
+    const updateData: Record<
+      string,
+      unknown
+    > = {
       ...data,
     };
 
     /* =====================================================
-       PUBLISHED DATE
-    ====================================================== */
+       SET PUBLISHED DATE
+    ===================================================== */
 
     if (
-      data.status ===
-      "published" &&
+      nextStatus ===
+        "published" &&
       !existing.publishedAt
     ) {
       updateData.publishedAt =
@@ -722,7 +934,7 @@ export async function updateAnnouncement(
 
     /* =====================================================
        MOVING BACK TO DRAFT
-    ====================================================== */
+    ===================================================== */
 
     if (
       data.status ===
@@ -748,6 +960,7 @@ export async function updateAnnouncement(
     if (!announcement) {
       return res.status(404).json({
         success: false,
+
         message:
           "Announcement not found",
       });
@@ -755,46 +968,32 @@ export async function updateAnnouncement(
 
     /* =====================================================
        NEWLY PUBLISHED
-    ====================================================== */
+    ===================================================== */
 
     if (
       !wasPublished &&
       willBePublished
     ) {
-      const announcementId =
-        announcement._id.toString();
+      await notifyAnnouncementPublished(
+        {
+          _id:
+            announcement._id,
 
-      await notifyAdmins({
-        title:
-          "Announcement Published",
-        message:
-          `"${announcement.title}" has been published.`,
-        type:
-          "announcement",
-        link:
-          "/dashboards/admin/announcements",
-        metadata: {
-          announcementId,
+          title:
+            announcement.title,
+
+          audience:
+            announcement.audience as AnnouncementAudience,
         },
-      });
-
-      await notifyFinanceIfNeeded(
-        announcement.audience,
-        announcement.title,
-        announcementId,
-      );
-
-      await notifyLecturersIfNeeded(
-        announcement.audience,
-        announcement.title,
-        announcementId,
       );
     }
 
     return res.status(200).json({
       success: true,
+
       message:
         "Announcement updated successfully",
+
       announcement,
     });
   } catch (error) {
@@ -804,8 +1003,10 @@ export async function updateAnnouncement(
     ) {
       return res.status(400).json({
         success: false,
+
         message:
           "Validation failed",
+
         errors:
           error.flatten()
             .fieldErrors,
@@ -819,6 +1020,7 @@ export async function updateAnnouncement(
 
     return res.status(500).json({
       success: false,
+
       message:
         "Unable to update announcement",
     });
@@ -843,6 +1045,7 @@ export async function publishAnnouncement(
     ) {
       return res.status(400).json({
         success: false,
+
         message:
           "Invalid announcement ID",
       });
@@ -856,6 +1059,7 @@ export async function publishAnnouncement(
     if (!announcement) {
       return res.status(404).json({
         success: false,
+
         message:
           "Announcement not found",
       });
@@ -867,6 +1071,7 @@ export async function publishAnnouncement(
     ) {
       return res.status(400).json({
         success: false,
+
         message:
           "Announcement is already published",
       });
@@ -885,51 +1090,25 @@ export async function publishAnnouncement(
       "name email role",
     );
 
-    const announcementId =
-      announcement._id.toString();
+    await notifyAnnouncementPublished(
+      {
+        _id:
+          announcement._id,
 
-    /* =====================================================
-       ADMIN
-    ====================================================== */
+        title:
+          announcement.title,
 
-    await notifyAdmins({
-      title:
-        "Announcement Published",
-      message:
-        `"${announcement.title}" has been published.`,
-      type:
-        "announcement",
-      link:
-        "/dashboards/admin/announcements",
-      metadata: {
-        announcementId,
+        audience:
+          announcement.audience as AnnouncementAudience,
       },
-    });
-
-    /* =====================================================
-       FINANCE
-    ====================================================== */
-
-    await notifyFinanceIfNeeded(
-      announcement.audience,
-      announcement.title,
-      announcementId,
-    );
-
-    /* =====================================================
-       LECTURERS
-    ====================================================== */
-
-    await notifyLecturersIfNeeded(
-      announcement.audience,
-      announcement.title,
-      announcementId,
     );
 
     return res.status(200).json({
       success: true,
+
       message:
         "Announcement published successfully",
+
       announcement,
     });
   } catch (error) {
@@ -940,6 +1119,7 @@ export async function publishAnnouncement(
 
     return res.status(500).json({
       success: false,
+
       message:
         "Unable to publish announcement",
     });
@@ -964,6 +1144,7 @@ export async function archiveAnnouncement(
     ) {
       return res.status(400).json({
         success: false,
+
         message:
           "Invalid announcement ID",
       });
@@ -988,6 +1169,7 @@ export async function archiveAnnouncement(
     if (!announcement) {
       return res.status(404).json({
         success: false,
+
         message:
           "Announcement not found",
       });
@@ -995,8 +1177,10 @@ export async function archiveAnnouncement(
 
     return res.status(200).json({
       success: true,
+
       message:
         "Announcement archived successfully",
+
       announcement,
     });
   } catch (error) {
@@ -1007,6 +1191,7 @@ export async function archiveAnnouncement(
 
     return res.status(500).json({
       success: false,
+
       message:
         "Unable to archive announcement",
     });
@@ -1031,6 +1216,7 @@ export async function deleteAnnouncement(
     ) {
       return res.status(400).json({
         success: false,
+
         message:
           "Invalid announcement ID",
       });
@@ -1044,6 +1230,7 @@ export async function deleteAnnouncement(
     if (!announcement) {
       return res.status(404).json({
         success: false,
+
         message:
           "Announcement not found",
       });
@@ -1051,6 +1238,7 @@ export async function deleteAnnouncement(
 
     return res.status(200).json({
       success: true,
+
       message:
         "Announcement deleted successfully",
     });
@@ -1062,6 +1250,7 @@ export async function deleteAnnouncement(
 
     return res.status(500).json({
       success: false,
+
       message:
         "Unable to delete announcement",
     });

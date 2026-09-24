@@ -13,17 +13,17 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   ClipboardCheck,
   GraduationCap,
   LayoutDashboard,
+  Loader2,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   ShieldCheck,
   UserRound,
   X,
-  Loader2,
 } from "lucide-react";
 
 import { AiOutlineBarChart } from "react-icons/ai";
@@ -150,6 +150,21 @@ const navigation: NavSection[] = [
 ];
 
 /* =========================================================
+   HELPERS
+========================================================= */
+
+function getInitials(name: string) {
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("") || "LE"
+  );
+}
+
+/* =========================================================
    COMPONENT
 ========================================================= */
 
@@ -165,6 +180,7 @@ export default function LecturerSidebar({
   const [profileOpen, setProfileOpen] = useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [logoHovered, setLogoHovered] = useState(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -181,13 +197,7 @@ export default function LecturerSidebar({
   const userImage =
     session?.user?.image || null;
 
-  const initials =
-    userName
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part.charAt(0).toUpperCase())
-      .join("") || "LE";
+  const initials = getInitials(userName);
 
   /* =======================================================
      ACTIVE NAVIGATION
@@ -211,6 +221,18 @@ export default function LecturerSidebar({
   function handleNavClick() {
     onMobileClose?.();
     setProfileOpen(false);
+  }
+
+  /* =======================================================
+     SIDEBAR TOGGLE
+  ======================================================= */
+
+  function toggleSidebar() {
+    if (!onCollapsedChange) return;
+
+    setProfileOpen(false);
+
+    onCollapsedChange(!collapsed);
   }
 
   /* =======================================================
@@ -254,9 +276,13 @@ export default function LecturerSidebar({
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setProfileOpen(false);
-        setLogoutModalOpen(false);
+      if (event.key !== "Escape") return;
+
+      setProfileOpen(false);
+      setLogoutModalOpen(false);
+
+      if (mobileOpen) {
+        onMobileClose?.();
       }
     }
 
@@ -271,7 +297,36 @@ export default function LecturerSidebar({
         handleEscape,
       );
     };
-  }, []);
+  }, [
+    mobileOpen,
+    onMobileClose,
+  ]);
+
+  /* =======================================================
+     LOCK BODY SCROLL ON MOBILE
+  ======================================================= */
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const originalOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow =
+        originalOverflow;
+    };
+  }, [mobileOpen]);
+
+  /* =======================================================
+     CLOSE PROFILE WHEN ROUTE CHANGES
+  ======================================================= */
+
+  useEffect(() => {
+    setProfileOpen(false);
+  }, [pathname]);
 
   /* =======================================================
      LOGOUT
@@ -309,7 +364,7 @@ export default function LecturerSidebar({
   }
 
   /* =======================================================
-     PROFILE ACTIVE STATE
+     PROFILE ACTIVE STATES
   ======================================================= */
 
   const profileActive =
@@ -372,7 +427,11 @@ export default function LecturerSidebar({
           flex
           flex-col
 
-          w-72
+          ${
+            collapsed
+              ? "w-[88px]"
+              : "w-72"
+          }
 
           border-r
           border-white/[0.07]
@@ -382,66 +441,19 @@ export default function LecturerSidebar({
 
           shadow-[8px_0_30px_rgba(0,0,0,0.08)]
 
-          transition-transform
+          transition-[width,transform]
           duration-300
           ease-in-out
 
           ${
             mobileOpen
               ? "translate-x-0"
-              : "-translate-x-full"
-          }
-
-          lg:translate-x-0
-
-          lg:transition-[width]
-          lg:duration-300
-          lg:ease-in-out
-
-          ${
-            collapsed
-              ? "lg:w-[88px]"
-              : "lg:w-72"
+              : "-translate-x-full lg:translate-x-0"
           }
         `}
       >
         {/* ===================================================
-            MOBILE CLOSE
-        ==================================================== */}
-
-        <button
-          type="button"
-          onClick={onMobileClose}
-          aria-label="Close menu"
-          className="
-            absolute
-            right-3
-            top-3
-            z-10
-
-            flex
-            h-8
-            w-8
-            items-center
-            justify-center
-
-            rounded-lg
-
-            text-white/50
-
-            transition
-
-            hover:bg-white/[0.08]
-            hover:text-white
-
-            lg:hidden
-          "
-        >
-          <X className="h-4 w-4" />
-        </button>
-
-        {/* ===================================================
-            BRAND
+            BRAND / COLLAPSE CONTROL
         ==================================================== */}
 
         <div
@@ -477,7 +489,7 @@ export default function LecturerSidebar({
 
               ${
                 collapsed
-                  ? "p-4 lg:p-3"
+                  ? "p-3"
                   : "p-4"
               }
             `}
@@ -502,33 +514,66 @@ export default function LecturerSidebar({
               "
             />
 
-            {/* Logo */}
+            {/* =================================================
+                LOGO TOGGLE
 
-            <Link
-              href="/dashboards/lecturer"
-              onClick={handleNavClick}
+                Expanded:
+                normal = logo
+                hover = collapse icon
+
+                Collapsed:
+                normal = logo
+                hover = expand icon
+            ================================================== */}
+
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              onMouseEnter={() =>
+                setLogoHovered(true)
+              }
+              onMouseLeave={() =>
+                setLogoHovered(false)
+              }
+              aria-label={
+                collapsed
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
+              }
               title={
                 collapsed
-                  ? "ITMT Lecturer Portal"
-                  : undefined
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
               }
               className={`
+                group
                 relative
 
                 flex
+                w-full
                 items-center
                 gap-3
+
+                rounded-xl
+
+                text-left
 
                 transition-all
                 duration-300
 
+                focus:outline-none
+                focus-visible:ring-2
+                focus-visible:ring-brand-gold/50
+
                 ${
                   collapsed
-                    ? "lg:justify-center"
+                    ? "justify-center"
                     : ""
                 }
               `}
             >
+              {/* Logo / Hover Icon */}
+
               <div
                 className="
                   relative
@@ -548,17 +593,68 @@ export default function LecturerSidebar({
                   bg-white
 
                   shadow-lg
+
+                  transition-all
+                  duration-300
+
+                  group-hover:bg-brand-gold
                 "
               >
+                {/* Actual logo */}
+
                 <Image
                   src="/newLogo.png"
                   alt="ITMT logo"
                   fill
                   sizes="44px"
                   priority
-                  className="object-contain p-1.5"
+                  className={`
+                    object-contain
+                    p-1.5
+
+                    transition-all
+                    duration-200
+
+                    ${
+                      logoHovered
+                        ? "scale-75 opacity-0"
+                        : "scale-100 opacity-100"
+                    }
+                  `}
                 />
+
+                {/* Collapse / Expand icon */}
+
+                <span
+                  className={`
+                    absolute
+                    inset-0
+
+                    flex
+                    items-center
+                    justify-center
+
+                    text-brand-navy
+
+                    transition-all
+                    duration-200
+
+                    ${
+                      logoHovered
+                        ? "scale-100 opacity-100"
+                        : "scale-75 opacity-0"
+                    }
+                  `}
+                >
+                  {collapsed ? (
+                    <PanelLeftOpen className="h-5 w-5" />
+                  ) : (
+                    <PanelLeftClose className="h-5 w-5" />
+                  )}
+                </span>
               </div>
+
+              {/* Brand text */}
 
               <div
                 className={`
@@ -568,13 +664,10 @@ export default function LecturerSidebar({
                   transition-all
                   duration-300
 
-                  w-auto
-                  opacity-100
-
                   ${
                     collapsed
-                      ? "lg:w-0 lg:opacity-0"
-                      : ""
+                      ? "w-0 opacity-0"
+                      : "w-auto opacity-100"
                   }
                 `}
               >
@@ -586,13 +679,16 @@ export default function LecturerSidebar({
                   Lecturer Portal
                 </p>
               </div>
-            </Link>
+            </button>
 
-            {/* Online status */}
+            {/* =================================================
+                ONLINE STATUS
+            ================================================== */}
 
             <div
               className={`
                 relative
+
                 mt-4
 
                 flex
@@ -604,7 +700,7 @@ export default function LecturerSidebar({
 
                 ${
                   collapsed
-                    ? "lg:mt-3 lg:justify-center"
+                    ? "mt-3 justify-center"
                     : ""
                 }
               `}
@@ -617,23 +713,19 @@ export default function LecturerSidebar({
 
               <span
                 className={`
-                  block
-                  w-auto
                   whitespace-nowrap
 
                   text-[10px]
                   font-medium
                   text-white/45
 
-                  opacity-100
-
                   transition-all
                   duration-300
 
                   ${
                     collapsed
-                      ? "lg:hidden lg:w-0 lg:opacity-0"
-                      : ""
+                      ? "hidden w-0 opacity-0"
+                      : "w-auto opacity-100"
                   }
                 `}
               >
@@ -681,20 +773,20 @@ export default function LecturerSidebar({
 
                     ${
                       collapsed
-                        ? "lg:justify-center lg:gap-0 lg:px-0"
+                        ? "justify-center gap-0 px-0"
                         : ""
                     }
                   `}
                 >
                   {collapsed ? (
                     <>
-                      <span className="hidden h-px w-8 bg-white/[0.08] lg:block" />
+                      <span className="h-px w-8 bg-white/[0.08]" />
 
-                      <span className="whitespace-nowrap text-[9px] font-bold uppercase tracking-[0.2em] text-white/30 lg:hidden">
+                      {/* Tooltip-style section label */}
+
+                      <span className="sr-only">
                         {section.label}
                       </span>
-
-                      <div className="h-px flex-1 bg-white/[0.05] lg:hidden" />
                     </>
                   ) : (
                     <>
@@ -716,158 +808,229 @@ export default function LecturerSidebar({
                       isActive(item.href);
 
                     return (
-                      <Link
+                      <div
                         key={`${section.label}-${item.href}`}
-                        href={item.href}
-                        onClick={handleNavClick}
-                        aria-current={
-                          active
-                            ? "page"
-                            : undefined
-                        }
-                        title={
-                          collapsed
-                            ? item.label
-                            : undefined
-                        }
-                        className={`
-                          group
-                          relative
-
-                          flex
-                          w-full
-                          items-center
-                          gap-3
-
-                          rounded-xl
-
-                          px-3
-                          py-2.5
-
-                          text-left
-
-                          transition-all
-                          duration-200
-
-                          ${
-                            collapsed
-                              ? "lg:justify-center lg:px-2"
-                              : ""
-                          }
-
-                          ${
-                            active
-                              ? "bg-white/[0.08]"
-                              : "hover:bg-white/[0.06]"
-                          }
-                        `}
+                        className="group/nav relative"
                       >
-                        {/* Active indicator */}
-
-                        <span
+                        <Link
+                          href={item.href}
+                          onClick={handleNavClick}
+                          aria-current={
+                            active
+                              ? "page"
+                              : undefined
+                          }
+                          title={
+                            collapsed
+                              ? item.label
+                              : undefined
+                          }
                           className={`
-                            absolute
-                            left-0
+                            group
 
-                            h-6
-                            w-[2px]
+                            relative
 
-                            rounded-r-full
-
-                            bg-brand-gold
-
-                            transition-opacity
-
-                            ${
-                              active
-                                ? "opacity-100"
-                                : "opacity-0"
-                            }
-                          `}
-                        />
-
-                        {/* Icon */}
-
-                        <span
-                          className={`
                             flex
-                            h-8
-                            w-8
-                            shrink-0
-
+                            w-full
                             items-center
-                            justify-center
+                            gap-3
 
-                            rounded-lg
+                            rounded-xl
+
+                            px-3
+                            py-2.5
+
+                            text-left
 
                             transition-all
                             duration-200
 
                             ${
-                              active
-                                ? "bg-brand-gold/20 text-brand-gold"
-                                : "bg-white/[0.035] text-white/40 group-hover:bg-brand-gold/10 group-hover:text-brand-gold"
-                            }
-                          `}
-                        >
-                          <Icon className="h-4 w-4" />
-                        </span>
-
-                        {/* Label */}
-
-                        <span
-                          className={`
-                            min-w-0
-                            flex-1
-
-                            truncate
-
-                            text-[13px]
-                            font-medium
-
-                            transition-all
-                            duration-300
-
-                            w-auto
-                            opacity-100
-
-                            ${
                               collapsed
-                                ? "lg:w-0 lg:opacity-0"
+                                ? "justify-center px-2"
                                 : ""
                             }
 
                             ${
                               active
-                                ? "text-white"
-                                : "text-white/65 group-hover:text-white"
+                                ? "bg-white/[0.08]"
+                                : "hover:bg-white/[0.06]"
                             }
                           `}
                         >
-                          {item.label}
-                        </span>
+                          {/* Active indicator */}
 
-                        {/* Arrow */}
+                          <span
+                            className={`
+                              absolute
+                              left-0
 
-                        <ChevronRight
-                          className={`
-                            h-3.5
-                            w-3.5
-                            shrink-0
+                              h-6
+                              w-[2px]
 
-                            transition-all
-                            duration-200
+                              rounded-r-full
 
-                            ${
-                              collapsed
-                                ? "lg:hidden"
-                                : active
-                                  ? "translate-x-0.5 text-brand-gold/50"
-                                  : "text-white/0 group-hover:translate-x-0.5 group-hover:text-white/25"
-                            }
-                          `}
-                        />
-                      </Link>
+                              bg-brand-gold
+
+                              transition-opacity
+
+                              ${
+                                active
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              }
+                            `}
+                          />
+
+                          {/* Icon */}
+
+                          <span
+                            className={`
+                              flex
+                              h-8
+                              w-8
+                              shrink-0
+
+                              items-center
+                              justify-center
+
+                              rounded-lg
+
+                              transition-all
+                              duration-200
+
+                              ${
+                                active
+                                  ? "bg-brand-gold/20 text-brand-gold"
+                                  : "bg-white/[0.035] text-white/40 group-hover:bg-brand-gold/10 group-hover:text-brand-gold"
+                              }
+                            `}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </span>
+
+                          {/* Label */}
+
+                          <span
+                            className={`
+                              min-w-0
+                              flex-1
+
+                              truncate
+
+                              text-[13px]
+                              font-medium
+
+                              transition-all
+                              duration-300
+
+                              ${
+                                collapsed
+                                  ? "hidden w-0 opacity-0"
+                                  : "w-auto opacity-100"
+                              }
+
+                              ${
+                                active
+                                  ? "text-white"
+                                  : "text-white/65 group-hover:text-white"
+                              }
+                            `}
+                          >
+                            {item.label}
+                          </span>
+
+                          {/* Arrow */}
+
+                          <ChevronRight
+                            className={`
+                              h-3.5
+                              w-3.5
+                              shrink-0
+
+                              transition-all
+                              duration-200
+
+                              ${
+                                collapsed
+                                  ? "hidden"
+                                  : active
+                                    ? "translate-x-0.5 text-brand-gold/50"
+                                    : "text-white/0 group-hover:translate-x-0.5 group-hover:text-white/25"
+                              }
+                            `}
+                          />
+                        </Link>
+
+                        {/* =================================================
+                            COLLAPSED TOOLTIP
+                        ================================================== */}
+
+                        {collapsed && (
+                          <div
+                            className="
+                              pointer-events-none
+
+                              absolute
+                              left-[calc(100%+12px)]
+                              top-1/2
+                              z-[100]
+
+                              hidden
+                              -translate-y-1/2
+
+                              whitespace-nowrap
+
+                              rounded-lg
+
+                              border
+                              border-white/[0.08]
+
+                              bg-[#081a35]
+
+                              px-3
+                              py-2
+
+                              text-[11px]
+                              font-semibold
+                              text-white
+
+                              opacity-0
+
+                              shadow-xl
+                              shadow-black/30
+
+                              transition-all
+                              duration-200
+
+                              group-hover/nav:block
+                              group-hover/nav:opacity-100
+                            "
+                          >
+                            {item.label}
+
+                            <span
+                              className="
+                                absolute
+                                -left-1
+                                top-1/2
+
+                                h-2
+                                w-2
+
+                                -translate-y-1/2
+                                rotate-45
+
+                                border-l
+                                border-b
+                                border-white/[0.08]
+
+                                bg-[#081a35]
+                              "
+                            />
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -905,6 +1068,11 @@ export default function LecturerSidebar({
             onClick={toggleProfile}
             aria-expanded={profileOpen}
             aria-haspopup="menu"
+            title={
+              collapsed
+                ? `${userName} profile`
+                : undefined
+            }
             className={`
               group
 
@@ -932,7 +1100,7 @@ export default function LecturerSidebar({
 
               ${
                 collapsed
-                  ? "lg:justify-center lg:p-2"
+                  ? "justify-center p-2"
                   : ""
               }
             `}
@@ -1016,7 +1184,7 @@ export default function LecturerSidebar({
 
                 ${
                   collapsed
-                    ? "lg:hidden"
+                    ? "hidden"
                     : ""
                 }
               `}
@@ -1051,7 +1219,7 @@ export default function LecturerSidebar({
 
                 ${
                   collapsed
-                    ? "lg:hidden"
+                    ? "hidden"
                     : ""
                 }
               `}
@@ -1067,6 +1235,7 @@ export default function LecturerSidebar({
               role="menu"
               className={`
                 absolute
+
                 bottom-full
                 mb-3
 
@@ -1084,13 +1253,10 @@ export default function LecturerSidebar({
 
                 backdrop-blur-xl
 
-                left-3
-                right-3
-
                 ${
                   collapsed
-                    ? "lg:left-[76px] lg:right-auto lg:w-64"
-                    : ""
+                    ? "left-[76px] w-64"
+                    : "left-3 right-3"
                 }
               `}
             >
@@ -1163,10 +1329,7 @@ export default function LecturerSidebar({
               ================================================= */}
 
               <div className="p-2">
-
-                {/* =================================================
-                    PROFILE
-                ================================================= */}
+                {/* PROFILE */}
 
                 <Link
                   href="/dashboards/lecturer/profile"
@@ -1262,9 +1425,7 @@ export default function LecturerSidebar({
                   />
                 </Link>
 
-                {/* =================================================
-                    SETTINGS
-                ================================================= */}
+                {/* SETTINGS */}
 
                 <Link
                   href="/dashboards/lecturer/settings"
@@ -1360,9 +1521,7 @@ export default function LecturerSidebar({
                   />
                 </Link>
 
-                {/* =================================================
-                    SIGN OUT
-                ================================================= */}
+                {/* SIGN OUT */}
 
                 <button
                   type="button"
@@ -1454,7 +1613,7 @@ export default function LecturerSidebar({
 
               ${
                 collapsed
-                  ? "lg:hidden"
+                  ? "hidden"
                   : ""
               }
             `}
@@ -1462,75 +1621,79 @@ export default function LecturerSidebar({
             ITMT MANAGEMENT SYSTEM • LECTURER
           </p>
         </div>
-
-        {/* ===================================================
-            DESKTOP COLLAPSE BUTTON
-        ==================================================== */}
-
-        {onCollapsedChange && (
-          <button
-            type="button"
-            onClick={() =>
-              onCollapsedChange(!collapsed)
-            }
-            aria-label={
-              collapsed
-                ? "Expand sidebar"
-                : "Collapse sidebar"
-            }
-            title={
-              collapsed
-                ? "Expand sidebar"
-                : "Collapse sidebar"
-            }
-            className="
-              absolute
-              -right-3
-              top-24
-              z-[60]
-
-              hidden
-
-              h-7
-              w-7
-
-              items-center
-              justify-center
-
-              rounded-full
-
-              border
-              border-white/10
-
-              bg-brand-navy
-
-              text-white/50
-
-              shadow-lg
-              shadow-black/20
-
-              transition-all
-              duration-200
-
-              hover:border-brand-gold/30
-              hover:bg-brand-gold
-              hover:text-brand-navy
-
-              focus:outline-none
-              focus:ring-2
-              focus:ring-brand-gold/30
-
-              lg:flex
-            "
-          >
-            {collapsed ? (
-              <ChevronsRight className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronsLeft className="h-3.5 w-3.5" />
-            )}
-          </button>
-        )}
       </aside>
+
+      {/* =====================================================
+          FLOATING MOBILE CLOSE BUTTON
+
+          IMPORTANT:
+          This stays OUTSIDE the sidebar.
+      ====================================================== */}
+
+      <div
+       className={`
+          pointer-events-none
+          fixed
+          left-85
+          top-150
+          z-[100]
+          -translate-x-1/2
+          lg:hidden
+          transition-all
+          duration-300
+          ease-out
+
+          ${
+            mobileOpen
+              ? "translate-y-0 opacity-100"
+              : "-translate-y-5 opacity-0"
+          }
+        `}
+      >
+        <button
+          type="button"
+          onClick={onMobileClose}
+          aria-label="Close lecturer menu"
+          title="Close menu"
+          className="
+            pointer-events-auto
+
+            flex
+            h-10
+            w-10
+
+            -translate-x-1/2
+
+            items-center
+            justify-center
+
+            rounded-full
+
+            border
+            border-white/10
+
+            bg-brand-navy
+
+            text-white/60
+
+            shadow-xl
+            shadow-black/30
+
+            transition-all
+            duration-200
+
+            hover:border-brand-gold/30
+            hover:bg-brand-gold
+            hover:text-brand-navy
+
+            focus:outline-none
+            focus:ring-2
+            focus:ring-brand-gold/40
+          "
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
 
       {/* =====================================================
           LOGOUT MODAL

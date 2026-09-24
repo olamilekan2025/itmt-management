@@ -5,6 +5,7 @@ import {
   Menu,
   Search,
   UserRound,
+  X,
 } from "lucide-react";
 
 import {
@@ -17,6 +18,8 @@ import {
 } from "next-auth/react";
 
 import {
+  useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -59,21 +62,24 @@ export default function StudentLayout({
     session?.user?.email?.trim() ||
     "student@itmt.edu.ng";
 
-  const initials =
-    userName
-      .split(" ")
+  const initials = useMemo(() => {
+    const parts = userName
+      .split(/\s+/)
       .filter(Boolean)
-      .slice(0, 2)
-      .map((part) =>
-        part.charAt(0).toUpperCase(),
-      )
-      .join("") || "ST";
+      .slice(0, 2);
+
+    const value = parts
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("");
+
+    return value || "ST";
+  }, [userName]);
 
   /* =======================================================
      PAGE TITLE
   ======================================================= */
 
-  function getPageTitle() {
+  const pageTitle = useMemo(() => {
     if (pathname === "/dashboards/student") {
       return "Dashboard";
     }
@@ -103,6 +109,9 @@ export default function StudentLayout({
     }
 
     if (
+      pathname.startsWith(
+        "/dashboards/student/academic-progress",
+      ) ||
       pathname.startsWith(
         "/dashboards/student/progress",
       )
@@ -191,9 +200,66 @@ export default function StudentLayout({
     }
 
     return "Student Portal";
-  }
+  }, [pathname]);
 
-  const pageTitle = getPageTitle();
+  /* =======================================================
+     MOBILE SIDEBAR
+  ======================================================= */
+
+  const closeMobileSidebar = () => {
+    setMobileOpen(false);
+  };
+
+  /*
+   * Close mobile sidebar automatically when the route changes.
+   */
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  /*
+   * Close mobile sidebar with Escape.
+   */
+  useEffect(() => {
+    if (!mobileOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileOpen(false);
+      }
+    };
+
+    window.addEventListener(
+      "keydown",
+      handleKeyDown,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      );
+    };
+  }, [mobileOpen]);
+
+  /*
+   * Prevent background scrolling while the mobile
+   * sidebar is open.
+   */
+  useEffect(() => {
+    if (!mobileOpen) {
+      document.body.style.overflow = "";
+      return;
+    }
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileOpen]);
 
   /* =======================================================
      AUTH LOADING
@@ -203,21 +269,21 @@ export default function StudentLayout({
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
+
           <div
-            className="
-              h-10
-              w-10
-              animate-spin
-              rounded-full
-              border-4
-              border-slate-200
-              border-t-brand-gold
-            "
+            className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-brand-gold"
           />
 
-          <p className="text-sm font-medium text-slate-500">
-            Loading Student Portal...
-          </p>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-slate-700">
+              Loading Student Portal
+            </p>
+
+            <p className="mt-1 text-xs text-slate-400">
+              Please wait...
+            </p>
+          </div>
+
         </div>
       </div>
     );
@@ -228,7 +294,29 @@ export default function StudentLayout({
   ======================================================= */
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen overflow-x-hidden bg-slate-50">
+
+      {/* ===================================================
+          MOBILE BACKDROP
+      ==================================================== */}
+
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="Close student menu"
+          onClick={closeMobileSidebar}
+          className="
+            fixed
+            inset-0
+            z-40
+
+            bg-slate-950/50
+            backdrop-blur-[2px]
+
+            lg:hidden
+          "
+        />
+      )}
 
       {/* ===================================================
           SIDEBAR
@@ -238,9 +326,7 @@ export default function StudentLayout({
         collapsed={collapsed}
         onCollapsedChange={setCollapsed}
         mobileOpen={mobileOpen}
-        onMobileClose={() =>
-          setMobileOpen(false)
-        }
+        onMobileClose={closeMobileSidebar}
       />
 
       {/* ===================================================
@@ -280,6 +366,8 @@ export default function StudentLayout({
 
             bg-white/90
 
+            shadow-[0_1px_12px_rgba(15,23,42,0.03)]
+
             backdrop-blur-xl
           "
         >
@@ -290,15 +378,18 @@ export default function StudentLayout({
               items-center
               justify-between
 
+              gap-4
+
               px-4
               sm:px-6
               lg:px-8
+              xl:px-10
             "
           >
 
             {/* =================================================
                 LEFT SIDE
-            ================================================= */}
+            ================================================== */}
 
             <div className="flex min-w-0 items-center gap-3">
 
@@ -307,9 +398,14 @@ export default function StudentLayout({
               <button
                 type="button"
                 onClick={() =>
-                  setMobileOpen(true)
+                  setMobileOpen((current) => !current)
                 }
-                aria-label="Open student menu"
+                aria-label={
+                  mobileOpen
+                    ? "Close student menu"
+                    : "Open student menu"
+                }
+                aria-expanded={mobileOpen}
                 className="
                   flex
                   h-10
@@ -329,31 +425,43 @@ export default function StudentLayout({
 
                   shadow-sm
 
-                  transition
+                  transition-all
+                  duration-200
 
-                  hover:border-brand-gold/30
+                  hover:border-brand-gold/40
                   hover:bg-brand-gold/5
                   hover:text-brand-navy
+
+                  active:scale-95
 
                   lg:hidden
                 "
               >
-                <Menu className="h-5 w-5" />
+                {mobileOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )}
               </button>
 
               {/* Page information */}
 
               <div className="min-w-0">
 
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+
+                  {/* Portal label */}
 
                   <span
                     className="
                       hidden
+                      shrink-0
+
                       text-[10px]
                       font-bold
                       uppercase
                       tracking-[0.18em]
+
                       text-brand-gold
 
                       sm:block
@@ -362,17 +470,24 @@ export default function StudentLayout({
                     Student Portal
                   </span>
 
+                  {/* Dot */}
+
                   <span
                     className="
                       hidden
                       h-1
                       w-1
+                      shrink-0
+
                       rounded-full
+
                       bg-slate-300
 
                       sm:block
                     "
                   />
+
+                  {/* Page title */}
 
                   <h1
                     className="
@@ -381,6 +496,7 @@ export default function StudentLayout({
                       text-base
                       font-bold
                       tracking-tight
+
                       text-slate-900
 
                       sm:text-lg
@@ -391,11 +507,17 @@ export default function StudentLayout({
 
                 </div>
 
+                {/* Subtitle */}
+
                 <p
                   className="
                     mt-0.5
+
                     hidden
+                    truncate
+
                     text-xs
+
                     text-slate-400
 
                     sm:block
@@ -409,15 +531,21 @@ export default function StudentLayout({
 
             {/* =================================================
                 RIGHT SIDE
-            ================================================= */}
+            ================================================== */}
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
 
               {/* Search */}
 
               <button
                 type="button"
-                aria-label="Search"
+                onClick={() =>
+                  router.push(
+                    "/dashboards/student/courses",
+                  )
+                }
+                aria-label="Search student portal"
+                title="Search"
                 className="
                   hidden
 
@@ -436,11 +564,16 @@ export default function StudentLayout({
 
                   text-slate-400
 
-                  transition
+                  shadow-sm
 
-                  hover:border-brand-gold/30
+                  transition-all
+                  duration-200
+
+                  hover:border-brand-gold/40
                   hover:bg-brand-gold/5
                   hover:text-brand-navy
+
+                  active:scale-95
 
                   sm:flex
                 "
@@ -457,13 +590,16 @@ export default function StudentLayout({
                     "/dashboards/student/notifications",
                   )
                 }
-                aria-label="Notifications"
+                aria-label="Open notifications"
+                title="Notifications"
                 className="
                   relative
 
                   flex
                   h-10
                   w-10
+
+                  shrink-0
 
                   items-center
                   justify-center
@@ -477,14 +613,21 @@ export default function StudentLayout({
 
                   text-slate-500
 
-                  transition
+                  shadow-sm
 
-                  hover:border-brand-gold/30
+                  transition-all
+                  duration-200
+
+                  hover:border-brand-gold/40
                   hover:bg-brand-gold/5
                   hover:text-brand-navy
+
+                  active:scale-95
                 "
               >
                 <Bell className="h-4 w-4" />
+
+                {/* Notification indicator */}
 
                 <span
                   className="
@@ -512,13 +655,16 @@ export default function StudentLayout({
                   hidden
                   h-8
                   w-px
+
                   bg-slate-200
 
                   sm:block
                 "
               />
 
-              {/* Student profile */}
+              {/* =================================================
+                  STUDENT PROFILE
+              ================================================== */}
 
               <button
                 type="button"
@@ -527,10 +673,12 @@ export default function StudentLayout({
                     "/dashboards/student/profile",
                   )
                 }
+                aria-label="Open student profile"
                 className="
                   group
 
                   flex
+                  min-w-0
                   items-center
                   gap-2.5
 
@@ -539,9 +687,12 @@ export default function StudentLayout({
                   px-1.5
                   py-1
 
-                  transition
+                  transition-all
+                  duration-200
 
                   hover:bg-slate-50
+
+                  active:scale-[0.98]
                 "
               >
 
@@ -565,15 +716,19 @@ export default function StudentLayout({
 
                     text-[11px]
                     font-bold
+
                     text-brand-navy
 
                     shadow-sm
+
+                    ring-1
+                    ring-brand-gold/20
                   "
                 >
                   {initials}
                 </div>
 
-                {/* Name */}
+                {/* User details */}
 
                 <div
                   className="
@@ -586,38 +741,48 @@ export default function StudentLayout({
                 >
                   <p
                     className="
-                      max-w-[140px]
+                      max-w-[150px]
+
                       truncate
 
                       text-xs
                       font-semibold
+
                       text-slate-800
                     "
+                    title={userName}
                   >
                     {userName}
                   </p>
 
                   <p
                     className="
-                      max-w-[140px]
+                      max-w-[150px]
+
                       truncate
 
                       text-[10px]
+
                       text-slate-400
                     "
+                    title={userEmail}
                   >
-                    Student
+                    {userEmail}
                   </p>
                 </div>
 
                 <UserRound
                   className="
                     hidden
+
                     h-3.5
                     w-3.5
+                    shrink-0
+
                     text-slate-300
 
-                    transition
+                    transition-colors
+                    duration-200
 
                     group-hover:text-brand-gold
 
@@ -626,7 +791,6 @@ export default function StudentLayout({
                 />
 
               </button>
-
             </div>
           </div>
         </header>
@@ -649,6 +813,7 @@ export default function StudentLayout({
             lg:py-8
 
             xl:px-10
+            xl:py-10
           "
         >
           <div

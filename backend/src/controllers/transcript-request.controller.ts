@@ -2,14 +2,16 @@ import type { Response } from "express";
 import { Types } from "mongoose";
 
 import { TranscriptRequest } from "../models/transcript-request.model.js";
+
 import {
   createTranscriptRequestSchema,
   updateTranscriptRequestStatusSchema,
 } from "../validators/transcript-request.validator.js";
+
 import type { AuthRequest } from "../middleware/auth.middleware.js";
 
 /* =========================================================
-   CONSTANTS
+   TYPES
 ========================================================= */
 
 const TRANSCRIPT_STATUSES = [
@@ -21,11 +23,16 @@ const TRANSCRIPT_STATUSES = [
   "collected",
 ] as const;
 
+type TranscriptStatus =
+  (typeof TRANSCRIPT_STATUSES)[number];
+
 /* =========================================================
    HELPERS
 ========================================================= */
 
-function isValidObjectId(id: unknown): id is string {
+function isValidObjectId(
+  id: unknown,
+): id is string {
   return (
     typeof id === "string" &&
     Types.ObjectId.isValid(id)
@@ -33,277 +40,339 @@ function isValidObjectId(id: unknown): id is string {
 }
 
 /* =========================================================
-   STUDENT — CREATE REQUEST
+   STUDENT
+   CREATE TRANSCRIPT REQUEST
 ========================================================= */
 
-export const createTranscriptRequest = async (
-  req: AuthRequest,
-  res: Response,
-) => {
-  try {
-    if (!req.user?.userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required.",
-      });
-    }
-
-    /*
-     * Only students can create transcript requests.
-     *
-     * The route should also use authorize("student"),
-     * but keeping this check here provides an additional
-     * layer of protection.
-     */
-    if (req.user.role !== "student") {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Only students can submit transcript requests.",
-      });
-    }
-
-    const parsed =
-      createTranscriptRequestSchema.safeParse(
-        req.body,
-      );
-
-    if (!parsed.success) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid request data.",
-        errors: parsed.error.flatten(),
-      });
-    }
-
-    const studentId = req.user.userId;
-
-    /*
-     * Prevent duplicate active requests.
-     */
-    const existing =
-      await TranscriptRequest.findOne({
-        student: studentId,
-        status: {
-          $in: [
-            "pending",
-            "approved",
-            "processing",
-            "ready",
-          ],
-        },
-      });
-
-    if (existing) {
-      return res.status(409).json({
-        success: false,
-        message:
-          "You already have an active transcript request.",
-        request: existing,
-      });
-    }
-
-    const request =
-      await TranscriptRequest.create({
-        student: studentId,
-        requestType:
-          parsed.data.requestType,
-        purpose:
-          parsed.data.purpose,
-        destination:
-          parsed.data.destination,
-        status: "pending",
-      });
-
-    const populatedRequest =
-      await TranscriptRequest.findById(
-        request._id,
-      ).populate(
-        "student",
-        "name email matricNumber programme",
-      );
-
-    return res.status(201).json({
-      success: true,
-      message:
-        "Transcript request submitted successfully.",
-      request: populatedRequest,
-    });
-  } catch (error) {
-    console.error(
-      "Create transcript request error:",
-      error,
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        "Unable to create transcript request.",
-    });
-  }
-};
-
-/* =========================================================
-   STUDENT — MY REQUESTS
-========================================================= */
-
-export const getMyTranscriptRequests = async (
-  req: AuthRequest,
-  res: Response,
-) => {
-  try {
-    if (!req.user?.userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required.",
-      });
-    }
-
-    if (req.user.role !== "student") {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Only students can access their transcript requests.",
-      });
-    }
-
-    const requests =
-      await TranscriptRequest.find({
-        student: req.user.userId,
-      })
-        .populate(
-          "student",
-          "name email matricNumber programme",
-        )
-        .populate(
-          "processedBy",
-          "name email",
-        )
-        .sort({
-          requestedAt: -1,
+export const createTranscriptRequest =
+  async (
+    req: AuthRequest,
+    res: Response,
+  ) => {
+    try {
+      if (!req.user?.userId) {
+        return res.status(401).json({
+          success: false,
+          message:
+            "Authentication required.",
         });
+      }
 
-    return res.status(200).json({
-      success: true,
-      requests,
-    });
-  } catch (error) {
-    console.error(
-      "Get my transcript requests error:",
-      error,
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        "Unable to load transcript requests.",
-    });
-  }
-};
-
-/* =========================================================
-   ADMIN — GET ALL REQUESTS
-========================================================= */
-
-export const getTranscriptRequests = async (
-  req: AuthRequest,
-  res: Response,
-) => {
-  try {
-    const { status, search } =
-      req.query;
-
-    const filter: Record<
-      string,
-      unknown
-    > = {};
-
-    /*
-     * Filter by status.
-     */
-    if (
-      typeof status === "string" &&
-      TRANSCRIPT_STATUSES.includes(
-        status as (typeof TRANSCRIPT_STATUSES)[number],
-      )
-    ) {
-      filter.status = status;
-    }
-
-    let requests =
-      await TranscriptRequest.find(
-        filter,
-      )
-        .populate(
-          "student",
-          "name email matricNumber programme",
-        )
-        .populate(
-          "processedBy",
-          "name email",
-        )
-        .sort({
-          requestedAt: -1,
+      if (
+        req.user.role !== "student"
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Only students can submit transcript requests.",
         });
+      }
 
-    /*
-     * Search populated student information.
-     *
-     * This is acceptable for the current expected
-     * transcript-request volume.
-     */
-    if (
-      typeof search === "string" &&
-      search.trim()
-    ) {
-      const query =
-        search.trim().toLowerCase();
+      /* =====================================================
+         VALIDATE REQUEST BODY
+      ===================================================== */
 
-      requests =
-        requests.filter(
-          (request) => {
-            const student =
-              request.student as unknown as {
-                name?: string;
-                email?: string;
-                matricNumber?: string;
-              };
-
-            return (
-              student?.name
-                ?.toLowerCase()
-                .includes(query) ||
-              student?.email
-                ?.toLowerCase()
-                .includes(query) ||
-              student?.matricNumber
-                ?.toLowerCase()
-                .includes(query)
-            );
-          },
+      const parsed =
+        createTranscriptRequestSchema.safeParse(
+          req.body,
         );
+
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid transcript request data.",
+          errors:
+            parsed.error.flatten(),
+        });
+      }
+
+      const studentId =
+        req.user.userId;
+
+      /* =====================================================
+         CHECK ACTIVE REQUEST
+      ===================================================== */
+
+      const existing =
+        await TranscriptRequest.findOne({
+          student: studentId,
+
+          status: {
+            $in: [
+              "pending",
+              "approved",
+              "processing",
+              "ready",
+            ],
+          },
+        });
+
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "You already have an active transcript request.",
+          request: existing,
+        });
+      }
+
+      /* =====================================================
+         CREATE REQUEST
+      ===================================================== */
+
+      const request =
+        await TranscriptRequest.create({
+          student: studentId,
+
+          requestType:
+            parsed.data.requestType,
+
+          purpose:
+            parsed.data.purpose,
+
+          destination:
+            parsed.data.destination,
+
+          status: "pending",
+        });
+
+      /* =====================================================
+         POPULATE REQUEST
+      ===================================================== */
+
+      const populatedRequest =
+        await TranscriptRequest.findById(
+          request._id,
+        ).populate(
+          "student",
+          "name email matricNumber programme",
+        );
+
+      return res.status(201).json({
+        success: true,
+
+        message:
+          "Transcript request submitted successfully.",
+
+        request:
+          populatedRequest,
+      });
+    } catch (error) {
+      console.error(
+        "Create transcript request error:",
+        error,
+      );
+
+      return res.status(500).json({
+        success: false,
+
+        message:
+          "Unable to create transcript request.",
+      });
     }
-
-    return res.status(200).json({
-      success: true,
-      requests,
-    });
-  } catch (error) {
-    console.error(
-      "Get transcript requests error:",
-      error,
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        "Unable to load transcript requests.",
-    });
-  }
-};
+  };
 
 /* =========================================================
-   ADMIN — GET SINGLE REQUEST
+   STUDENT
+   GET MY TRANSCRIPT REQUESTS
+========================================================= */
+
+export const getMyTranscriptRequests =
+  async (
+    req: AuthRequest,
+    res: Response,
+  ) => {
+    try {
+      if (!req.user?.userId) {
+        return res.status(401).json({
+          success: false,
+          message:
+            "Authentication required.",
+        });
+      }
+
+      if (
+        req.user.role !== "student"
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Only students can access their transcript requests.",
+        });
+      }
+
+      const requests =
+        await TranscriptRequest.find({
+          student: req.user.userId,
+        })
+          .populate(
+            "student",
+            "name email matricNumber programme",
+          )
+          .populate(
+            "processedBy",
+            "name email",
+          )
+          .sort({
+            requestedAt: -1,
+          });
+
+      return res.status(200).json({
+        success: true,
+
+        requests,
+      });
+    } catch (error) {
+      console.error(
+        "Get my transcript requests error:",
+        error,
+      );
+
+      return res.status(500).json({
+        success: false,
+
+        message:
+          "Unable to load transcript requests.",
+      });
+    }
+  };
+
+/* =========================================================
+   ADMIN
+   GET ALL TRANSCRIPT REQUESTS
+========================================================= */
+
+export const getTranscriptRequests =
+  async (
+    req: AuthRequest,
+    res: Response,
+  ) => {
+    try {
+      if (
+        !req.user?.userId
+      ) {
+        return res.status(401).json({
+          success: false,
+          message:
+            "Authentication required.",
+        });
+      }
+
+      if (
+        req.user.role !== "admin"
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Only administrators can access transcript requests.",
+        });
+      }
+
+      const {
+        status,
+        search,
+      } = req.query;
+
+      const filter: Record<
+        string,
+        unknown
+      > = {};
+
+      /* =====================================================
+         STATUS FILTER
+      ===================================================== */
+
+      if (
+        typeof status === "string" &&
+        TRANSCRIPT_STATUSES.includes(
+          status as TranscriptStatus,
+        )
+      ) {
+        filter.status = status;
+      }
+
+      /* =====================================================
+         GET REQUESTS
+      ===================================================== */
+
+      let requests =
+        await TranscriptRequest.find(
+          filter,
+        )
+          .populate(
+            "student",
+            "name email matricNumber programme",
+          )
+          .populate(
+            "processedBy",
+            "name email",
+          )
+          .sort({
+            requestedAt: -1,
+          });
+
+      /* =====================================================
+         SEARCH
+      ===================================================== */
+
+      if (
+        typeof search === "string" &&
+        search.trim()
+      ) {
+        const query =
+          search
+            .trim()
+            .toLowerCase();
+
+        requests =
+          requests.filter(
+            (request) => {
+              const student =
+                request.student as unknown as {
+                  name?: string;
+                  email?: string;
+                  matricNumber?: string;
+                };
+
+              return (
+                student?.name
+                  ?.toLowerCase()
+                  .includes(query) ||
+                student?.email
+                  ?.toLowerCase()
+                  .includes(query) ||
+                student?.matricNumber
+                  ?.toLowerCase()
+                  .includes(query)
+              );
+            },
+          );
+      }
+
+      return res.status(200).json({
+        success: true,
+
+        requests,
+      });
+    } catch (error) {
+      console.error(
+        "Get transcript requests error:",
+        error,
+      );
+
+      return res.status(500).json({
+        success: false,
+
+        message:
+          "Unable to load transcript requests.",
+      });
+    }
+  };
+
+/* =========================================================
+   ADMIN
+   GET SINGLE REQUEST
 ========================================================= */
 
 export const getTranscriptRequestById =
@@ -312,11 +381,35 @@ export const getTranscriptRequestById =
     res: Response,
   ) => {
     try {
-      const id = req.params.id;
+      if (
+        !req.user?.userId
+      ) {
+        return res.status(401).json({
+          success: false,
+          message:
+            "Authentication required.",
+        });
+      }
 
-      if (!isValidObjectId(id)) {
+      if (
+        req.user.role !== "admin"
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Only administrators can access transcript requests.",
+        });
+      }
+
+      const id =
+        req.params.id;
+
+      if (
+        !isValidObjectId(id)
+      ) {
         return res.status(400).json({
           success: false,
+
           message:
             "Invalid transcript request ID.",
         });
@@ -338,6 +431,7 @@ export const getTranscriptRequestById =
       if (!request) {
         return res.status(404).json({
           success: false,
+
           message:
             "Transcript request not found.",
         });
@@ -345,6 +439,7 @@ export const getTranscriptRequestById =
 
       return res.status(200).json({
         success: true,
+
         request,
       });
     } catch (error) {
@@ -355,6 +450,7 @@ export const getTranscriptRequestById =
 
       return res.status(500).json({
         success: false,
+
         message:
           "Unable to load transcript request.",
       });
@@ -362,7 +458,8 @@ export const getTranscriptRequestById =
   };
 
 /* =========================================================
-   ADMIN — UPDATE STATUS
+   ADMIN
+   UPDATE REQUEST STATUS
 ========================================================= */
 
 export const updateTranscriptRequestStatus =
@@ -371,23 +468,45 @@ export const updateTranscriptRequestStatus =
     res: Response,
   ) => {
     try {
-      if (!req.user?.userId) {
+      if (
+        !req.user?.userId
+      ) {
         return res.status(401).json({
           success: false,
+
           message:
             "Authentication required.",
         });
       }
 
-      const id = req.params.id;
+      if (
+        req.user.role !== "admin"
+      ) {
+        return res.status(403).json({
+          success: false,
 
-      if (!isValidObjectId(id)) {
+          message:
+            "Only administrators can update transcript requests.",
+        });
+      }
+
+      const id =
+        req.params.id;
+
+      if (
+        !isValidObjectId(id)
+      ) {
         return res.status(400).json({
           success: false,
+
           message:
             "Invalid transcript request ID.",
         });
       }
+
+      /* =====================================================
+         VALIDATE BODY
+      ===================================================== */
 
       const parsed =
         updateTranscriptRequestStatusSchema.safeParse(
@@ -397,12 +516,18 @@ export const updateTranscriptRequestStatus =
       if (!parsed.success) {
         return res.status(400).json({
           success: false,
+
           message:
             "Invalid status update.",
+
           errors:
             parsed.error.flatten(),
         });
       }
+
+      /* =====================================================
+         FIND REQUEST
+      ===================================================== */
 
       const request =
         await TranscriptRequest.findById(
@@ -412,6 +537,7 @@ export const updateTranscriptRequestStatus =
       if (!request) {
         return res.status(404).json({
           success: false,
+
           message:
             "Transcript request not found.",
         });
@@ -423,15 +549,12 @@ export const updateTranscriptRequestStatus =
         rejectionReason,
       } = parsed.data;
 
-      /*
-       * =====================================================
-       * STATUS TRANSITION PROTECTION
-       * =====================================================
-       */
+      /* =====================================================
+         STATUS TRANSITIONS
+      ===================================================== */
 
-      /*
-       * Collected is final.
-       */
+      /* Collected is final. */
+
       if (
         request.status ===
           "collected" &&
@@ -439,14 +562,14 @@ export const updateTranscriptRequestStatus =
       ) {
         return res.status(400).json({
           success: false,
+
           message:
             "A collected transcript request cannot be changed.",
         });
       }
 
-      /*
-       * Rejected requests must first be approved.
-       */
+      /* Rejected can be reopened only through approval. */
+
       if (
         request.status ===
           "rejected" &&
@@ -454,17 +577,14 @@ export const updateTranscriptRequestStatus =
       ) {
         return res.status(400).json({
           success: false,
+
           message:
             "A rejected request must first be approved before further processing.",
         });
       }
 
-      /*
-       * Pending requests can only be:
-       *
-       * approved
-       * rejected
-       */
+      /* Pending → Approved / Rejected */
+
       if (
         request.status ===
           "pending" &&
@@ -475,17 +595,14 @@ export const updateTranscriptRequestStatus =
       ) {
         return res.status(400).json({
           success: false,
+
           message:
             "A pending request can only be approved or rejected.",
         });
       }
 
-      /*
-       * Approved requests can move to:
-       *
-       * processing
-       * rejected
-       */
+      /* Approved → Processing / Rejected */
+
       if (
         request.status ===
           "approved" &&
@@ -496,16 +613,14 @@ export const updateTranscriptRequestStatus =
       ) {
         return res.status(400).json({
           success: false,
+
           message:
             "An approved request can only move to processing or rejected.",
         });
       }
 
-      /*
-       * Processing requests can move to:
-       *
-       * ready
-       */
+      /* Processing → Ready */
+
       if (
         request.status ===
           "processing" &&
@@ -513,16 +628,14 @@ export const updateTranscriptRequestStatus =
       ) {
         return res.status(400).json({
           success: false,
+
           message:
             "A processing request can only move to ready.",
         });
       }
 
-      /*
-       * Ready requests can move to:
-       *
-       * collected
-       */
+      /* Ready → Collected */
+
       if (
         request.status ===
           "ready" &&
@@ -530,16 +643,15 @@ export const updateTranscriptRequestStatus =
       ) {
         return res.status(400).json({
           success: false,
+
           message:
             "A ready request can only be marked as collected.",
         });
       }
 
-      /*
-       * =====================================================
-       * REJECTION VALIDATION
-       * =====================================================
-       */
+      /* =====================================================
+         REJECTION
+      ===================================================== */
 
       if (
         status === "rejected" &&
@@ -547,16 +659,15 @@ export const updateTranscriptRequestStatus =
       ) {
         return res.status(400).json({
           success: false,
+
           message:
             "A rejection reason is required when rejecting a transcript request.",
         });
       }
 
-      /*
-       * =====================================================
-       * UPDATE REQUEST
-       * =====================================================
-       */
+      /* =====================================================
+         APPLY UPDATE
+      ===================================================== */
 
       request.status =
         status;
@@ -568,7 +679,9 @@ export const updateTranscriptRequestStatus =
           adminNote;
       }
 
-      if (status === "rejected") {
+      if (
+        status === "rejected"
+      ) {
         request.rejectionReason =
           rejectionReason?.trim();
       } else {
@@ -576,10 +689,10 @@ export const updateTranscriptRequestStatus =
           undefined;
       }
 
-      /*
-       * Record the admin/staff member who
-       * processed the request.
-       */
+      /* =====================================================
+         PROCESSING INFORMATION
+      ===================================================== */
+
       if (
         [
           "approved",
@@ -597,9 +710,10 @@ export const updateTranscriptRequestStatus =
           new Date();
       }
 
-      /*
-       * Record collection time.
-       */
+      /* =====================================================
+         COLLECTION INFORMATION
+      ===================================================== */
+
       if (
         status === "collected"
       ) {
@@ -607,11 +721,16 @@ export const updateTranscriptRequestStatus =
           new Date();
       }
 
+      /* =====================================================
+         SAVE
+      ===================================================== */
+
       await request.save();
 
-      /*
-       * Return populated request.
-       */
+      /* =====================================================
+         RETURN POPULATED REQUEST
+      ===================================================== */
+
       const populatedRequest =
         await TranscriptRequest.findById(
           request._id,
@@ -627,8 +746,10 @@ export const updateTranscriptRequestStatus =
 
       return res.status(200).json({
         success: true,
+
         message:
           "Transcript request status updated successfully.",
+
         request:
           populatedRequest,
       });
@@ -640,9 +761,9 @@ export const updateTranscriptRequestStatus =
 
       return res.status(500).json({
         success: false,
+
         message:
           "Unable to update transcript request.",
       });
     }
   };
-

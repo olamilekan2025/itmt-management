@@ -81,7 +81,7 @@ export default function HeroSlidesAdminPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${API_URL}/hero-slides/all`, {
+      const res = await fetch(`${API_URL}/api/hero-slides/all`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -199,7 +199,7 @@ export default function HeroSlidesAdminPage() {
       body.append("order", String(order));
       body.append("image", image);
 
-      const res = await fetch(`${API_URL}/hero-slides`, {
+      const res = await fetch(`${API_URL}/api/hero-slides`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -270,7 +270,7 @@ export default function HeroSlidesAdminPage() {
     setIsEditing(true);
 
     try {
-      const res = await fetch(`${API_URL}/hero-slides/${editTarget._id}`, {
+      const res = await fetch(`${API_URL}/api/hero-slides/${editTarget._id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -310,7 +310,7 @@ export default function HeroSlidesAdminPage() {
     setUpdatingId(slide._id);
 
     try {
-      const res = await fetch(`${API_URL}/hero-slides/${slide._id}`, {
+      const res = await fetch(`${API_URL}/api/hero-slides/${slide._id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -360,7 +360,7 @@ export default function HeroSlidesAdminPage() {
     setDeletingId(id);
 
     try {
-      const res = await fetch(`${API_URL}/hero-slides/${id}`, {
+      const res = await fetch(`${API_URL}/api/hero-slides/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${accessToken}`,

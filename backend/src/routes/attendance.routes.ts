@@ -3,15 +3,40 @@ import { Router } from "express";
 import {
   getAttendanceHistory,
   getAttendanceRoster,
+  getMyAttendance,
   saveAttendance,
-} from "../controllers/attendance.controller";
+} from "../controllers/attendance.controller.js";
 
 import {
   authenticate,
   authorize,
-} from "../middleware/auth.middleware";
+} from "../middleware/auth.middleware.js";
 
 const router = Router();
+
+/**
+ * =========================================================
+ * STUDENT
+ * MY ATTENDANCE
+ * =========================================================
+ *
+ * GET
+ * /api/attendance/my
+ *
+ * Optional:
+ *
+ * ?course=COURSE_ID
+ * ?semester=SEMESTER_ID
+ *
+ * =========================================================
+ */
+
+router.get(
+  "/my",
+  authenticate,
+  authorize("student"),
+  getMyAttendance,
+);
 
 /**
  * =========================================================
@@ -22,6 +47,13 @@ const router = Router();
  * GET
  * /api/attendance/roster
  *
+ * Query:
+ *
+ * ?course=COURSE_ID
+ * &semester=SEMESTER_ID
+ * &date=2026-09-15
+ *
+ * =========================================================
  */
 
 router.get(
@@ -40,6 +72,12 @@ router.get(
  * GET
  * /api/attendance/history
  *
+ * Query:
+ *
+ * ?course=COURSE_ID
+ * &semester=SEMESTER_ID
+ *
+ * =========================================================
  */
 
 router.get(
@@ -58,6 +96,7 @@ router.get(
  * POST
  * /api/attendance
  *
+ * =========================================================
  */
 
 router.post(

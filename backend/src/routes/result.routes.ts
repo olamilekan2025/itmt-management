@@ -10,6 +10,10 @@ import {
 } from "../controllers/result.controller.js";
 
 import {
+  getMyTranscript,
+} from "../controllers/student-transcript.controller.js";
+
+import {
   authenticate,
   authorize,
 } from "../middleware/auth.middleware.js";
@@ -97,5 +101,16 @@ router.get(
   getMyResults,
 );
 
-export default router;
+/* =========================================================
+   STUDENT
+   GET MY TRANSCRIPT
+========================================================= */
 
+router.get(
+  "/transcript",
+  authenticate,
+  authorize("student"),
+  getMyTranscript,
+);
+
+export default router;

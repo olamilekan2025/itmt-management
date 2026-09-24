@@ -16,7 +16,7 @@ import {
 const router = Router();
 
 /* =========================================================
-   AUTHORIZED NOTIFICATION ROLES
+   ROLES ALLOWED TO USE NOTIFICATIONS
 ========================================================= */
 
 const notificationRoles = [
@@ -24,6 +24,7 @@ const notificationRoles = [
   "finance",
   "registrar",
   "lecturer",
+  "student",
 ] as const;
 
 /* =========================================================
@@ -38,8 +39,7 @@ router.get(
 );
 
 /* =========================================================
-   GET UNREAD NOTIFICATION COUNT
-   Used by dashboard notification bells
+   GET UNREAD COUNT
 ========================================================= */
 
 router.get(

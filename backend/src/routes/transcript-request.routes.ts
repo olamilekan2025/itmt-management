@@ -6,20 +6,23 @@ import {
   getTranscriptRequestById,
   getTranscriptRequests,
   updateTranscriptRequestStatus,
-} from "../controllers/transcript-request.controller";
+} from "../controllers/transcript-request.controller.js";
 
 import {
   authenticate,
   authorize,
-} from "../middleware/auth.middleware";
+} from "../middleware/auth.middleware.js";
 
-const router =
-  Router();
+const router = Router();
 
 /* =========================================================
    STUDENT
-========================================================= */
+   ========================================================= */
 
+/**
+ * Create a transcript request
+ * POST /api/transcript-requests
+ */
 router.post(
   "/",
   authenticate,
@@ -27,6 +30,14 @@ router.post(
   createTranscriptRequest,
 );
 
+/**
+ * Get my transcript requests
+ * GET /api/transcript-requests/my
+ *
+ * IMPORTANT:
+ * This route must come before "/:id"
+ * so "my" is not treated as an ID.
+ */
 router.get(
   "/my",
   authenticate,
@@ -36,8 +47,12 @@ router.get(
 
 /* =========================================================
    ADMIN
-========================================================= */
+   ========================================================= */
 
+/**
+ * Get all transcript requests
+ * GET /api/transcript-requests
+ */
 router.get(
   "/",
   authenticate,
@@ -45,6 +60,10 @@ router.get(
   getTranscriptRequests,
 );
 
+/**
+ * Get a single transcript request
+ * GET /api/transcript-requests/:id
+ */
 router.get(
   "/:id",
   authenticate,
@@ -52,6 +71,10 @@ router.get(
   getTranscriptRequestById,
 );
 
+/**
+ * Update transcript request status
+ * PATCH /api/transcript-requests/:id/status
+ */
 router.patch(
   "/:id/status",
   authenticate,

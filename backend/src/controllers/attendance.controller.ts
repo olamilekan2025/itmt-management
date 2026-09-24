@@ -5,10 +5,10 @@ import type { AuthRequest } from "../middleware/auth.middleware.js";
 
 import Attendance, {
   AttendanceStatus,
-} from "../models/attendance.model";
+} from "../models/attendance.model.js";
 
-import LecturerAssignment from "../models/LecturerAssignment";
-import Registration, { IRegistration } from "../models/Registration";
+import LecturerAssignment from "../models/LecturerAssignment.js";
+import Registration from "../models/Registration.js";
 
 /**
  * =========================================================
@@ -31,9 +31,32 @@ interface PopulatedStudent {
   programme?: Types.ObjectId;
 }
 
+interface PopulatedCourse {
+  _id: Types.ObjectId;
+  code: string;
+  title: string;
+  creditUnits?: number;
+  level?: string;
+}
+
+interface PopulatedSemester {
+  _id: Types.ObjectId;
+  name: string;
+  order?: number;
+  session?: Types.ObjectId;
+}
+
 /**
  * =========================================================
  * DATE HELPER
+ * =========================================================
+ *
+ * Attendance dates are normalized to UTC midnight so that:
+ *
+ * 2026-09-15
+ *
+ * always represents one attendance day.
+ *
  * =========================================================
  */
 
@@ -53,29 +76,32 @@ const normalizeAttendanceDate = (
 
 /**
  * =========================================================
- * LECTURER ID
+ * AUTHENTICATED USER ID
  * =========================================================
- *
- * AuthRequest is used because authenticate() adds:
- *
- * req.user = {
- *   userId: string;
- *   role: UserRole;
- * }
- *
+ */
+
+const getAuthenticatedUserId = (
+  req: AuthRequest,
+): string | null => {
+  const userId = req.user?.userId;
+
+  if (!userId) {
+    return null;
+  }
+
+  return userId;
+};
+
+/**
+ * =========================================================
+ * LECTURER ID
  * =========================================================
  */
 
 const getLecturerId = (
   req: AuthRequest,
 ): string | null => {
-  const lecturerId = req.user?.userId;
-
-  if (!lecturerId) {
-    return null;
-  }
-
-  return lecturerId;
+  return getAuthenticatedUserId(req);
 };
 
 /**
@@ -181,7 +207,7 @@ export const getAttendanceRoster = async (
 
     /**
      * -----------------------------------------------------
-     * VERIFY ASSIGNMENT
+     * VERIFY LECTURER ASSIGNMENT
      * -----------------------------------------------------
      */
 
@@ -222,26 +248,55 @@ export const getAttendanceRoster = async (
 
     /**
      * -----------------------------------------------------
+     * GET STUDENT IDS
+     * -----------------------------------------------------
+     */
+
+    const studentIds = registrations
+      .map((registration) => {
+        const student =
+          registration.student as unknown as
+            | PopulatedStudent
+            | Types.ObjectId
+            | null;
+
+        if (!student) {
+          return null;
+        }
+
+        if (
+          student instanceof Types.ObjectId
+        ) {
+          return student;
+        }
+
+        return student._id;
+      })
+      .filter(
+        (
+          id,
+        ): id is Types.ObjectId =>
+          Boolean(id),
+      );
+
+    /**
+     * -----------------------------------------------------
      * GET EXISTING ATTENDANCE
      * -----------------------------------------------------
      */
 
-    const studentIds =
-      registrations.map(
-        (registration: IRegistration) =>
-          registration.student,
-      );
-
     const existingAttendance =
-      await Attendance.find({
-        lecturer: lecturerId,
-        course,
-        semester,
-        date: attendanceDate,
-        student: {
-          $in: studentIds,
-        },
-      });
+      studentIds.length > 0
+        ? await Attendance.find({
+            lecturer: lecturerId,
+            course,
+            semester,
+            date: attendanceDate,
+            student: {
+              $in: studentIds,
+            },
+          })
+        : [];
 
     /**
      * -----------------------------------------------------
@@ -268,10 +323,24 @@ export const getAttendanceRoster = async (
      * -----------------------------------------------------
      */
 
-    const roster = registrations.map(
-      (registration: IRegistration) => {
+    const roster = registrations
+      .map((registration) => {
         const student =
-          registration.student as unknown as PopulatedStudent;
+          registration.student as unknown as
+            | PopulatedStudent
+            | Types.ObjectId
+            | null;
+
+        /**
+         * Skip registrations whose student
+         * reference could not be populated.
+         */
+        if (
+          !student ||
+          student instanceof Types.ObjectId
+        ) {
+          return null;
+        }
 
         const attendance =
           attendanceMap.get(
@@ -297,8 +366,14 @@ export const getAttendanceRoster = async (
               }
             : null,
         };
-      },
-    );
+      })
+      .filter(
+        (
+          item,
+        ): item is NonNullable<
+          typeof item
+        > => Boolean(item),
+      );
 
     /**
      * -----------------------------------------------------
@@ -332,20 +407,6 @@ export const getAttendanceRoster = async (
  *
  * POST
  * /api/attendance
- *
- * Body:
- *
- * {
- *   course: "...",
- *   semester: "...",
- *   date: "2026-09-15",
- *   records: [
- *     {
- *       student: "...",
- *       status: "present"
- *     }
- *   ]
- * }
  *
  * =========================================================
  */
@@ -459,12 +520,20 @@ export const saveAttendance = async (
       }).select("student");
 
     const registeredStudentIds =
-      new Set(
-        registrations.map(
-          (registration: IRegistration) =>
-            registration.student.toString(),
-        ),
-      );
+      new Set<string>();
+
+    for (const registration of registrations) {
+      const student =
+        registration.student as
+          | Types.ObjectId
+          | undefined;
+
+      if (student) {
+        registeredStudentIds.add(
+          student.toString(),
+        );
+      }
+    }
 
     /**
      * -----------------------------------------------------
@@ -481,7 +550,7 @@ export const saveAttendance = async (
 
     /**
      * -----------------------------------------------------
-     * VALIDATE EACH RECORD
+     * VALIDATE RECORDS
      * -----------------------------------------------------
      */
 
@@ -514,7 +583,9 @@ export const saveAttendance = async (
       }
 
       /**
-       * Prevent duplicate student records.
+       * ---------------------------------------------------
+       * PREVENT DUPLICATES
+       * ---------------------------------------------------
        */
 
       if (
@@ -530,7 +601,9 @@ export const saveAttendance = async (
       seenStudents.add(record.student);
 
       /**
-       * Student must be registered.
+       * ---------------------------------------------------
+       * STUDENT MUST BE REGISTERED
+       * ---------------------------------------------------
        */
 
       if (
@@ -546,7 +619,9 @@ export const saveAttendance = async (
       }
 
       /**
-       * Validate status.
+       * ---------------------------------------------------
+       * VALIDATE STATUS
+       * ---------------------------------------------------
        */
 
       if (
@@ -562,7 +637,9 @@ export const saveAttendance = async (
       }
 
       /**
-       * Validate note.
+       * ---------------------------------------------------
+       * VALIDATE NOTE
+       * ---------------------------------------------------
        */
 
       if (
@@ -577,7 +654,7 @@ export const saveAttendance = async (
       }
 
       if (
-        record.note &&
+        typeof record.note === "string" &&
         record.note.length > 500
       ) {
         return res.status(400).json({
@@ -600,19 +677,35 @@ export const saveAttendance = async (
       ).map((record) => ({
         updateOne: {
           filter: {
-            student: new Types.ObjectId(record.student),
-            lecturer: new Types.ObjectId(lecturerId),
-            course: new Types.ObjectId(course),
-            semester: new Types.ObjectId(semester),
+            student: new Types.ObjectId(
+              record.student,
+            ),
+            lecturer: new Types.ObjectId(
+              lecturerId,
+            ),
+            course: new Types.ObjectId(
+              course,
+            ),
+            semester: new Types.ObjectId(
+              semester,
+            ),
             date: attendanceDate,
           },
 
           update: {
             $set: {
-              student: new Types.ObjectId(record.student),
-              lecturer: new Types.ObjectId(lecturerId),
-              course: new Types.ObjectId(course),
-              semester: new Types.ObjectId(semester),
+              student: new Types.ObjectId(
+                record.student,
+              ),
+              lecturer: new Types.ObjectId(
+                lecturerId,
+              ),
+              course: new Types.ObjectId(
+                course,
+              ),
+              semester: new Types.ObjectId(
+                semester,
+              ),
               date: attendanceDate,
               status: record.status,
               note:
@@ -716,9 +809,9 @@ export const getAttendanceHistory =
       } = req.query;
 
       /**
-       * -----------------------------------------------------
+       * ---------------------------------------------------
        * VALIDATE QUERY
-       * -----------------------------------------------------
+       * ---------------------------------------------------
        */
 
       if (
@@ -748,9 +841,9 @@ export const getAttendanceHistory =
       }
 
       /**
-       * -----------------------------------------------------
+       * ---------------------------------------------------
        * VERIFY ASSIGNMENT
-       * -----------------------------------------------------
+       * ---------------------------------------------------
        */
 
       const assignment =
@@ -769,9 +862,9 @@ export const getAttendanceHistory =
       }
 
       /**
-       * -----------------------------------------------------
+       * ---------------------------------------------------
        * GET ATTENDANCE
-       * -----------------------------------------------------
+       * ---------------------------------------------------
        */
 
       const attendance =
@@ -790,9 +883,9 @@ export const getAttendanceHistory =
           });
 
       /**
-       * -----------------------------------------------------
+       * ---------------------------------------------------
        * GROUP BY DATE
-       * -----------------------------------------------------
+       * ---------------------------------------------------
        */
 
       const grouped =
@@ -809,10 +902,9 @@ export const getAttendanceHistory =
         >();
 
       for (const record of attendance) {
-        const key =
-          record.date
-            .toISOString()
-            .slice(0, 10);
+        const key = record.date
+          .toISOString()
+          .slice(0, 10);
 
         if (!grouped.has(key)) {
           grouped.set(key, {
@@ -830,22 +922,36 @@ export const getAttendanceHistory =
 
         session.total += 1;
 
-        if (record.status === "present") {
+        if (
+          record.status === "present"
+        ) {
           session.present += 1;
         }
 
-        if (record.status === "absent") {
+        if (
+          record.status === "absent"
+        ) {
           session.absent += 1;
         }
 
-        if (record.status === "late") {
+        if (
+          record.status === "late"
+        ) {
           session.late += 1;
         }
 
-        if (record.status === "excused") {
+        if (
+          record.status === "excused"
+        ) {
           session.excused += 1;
         }
       }
+
+      /**
+       * ---------------------------------------------------
+       * SORT HISTORY
+       * ---------------------------------------------------
+       */
 
       const history =
         Array.from(
@@ -857,9 +963,9 @@ export const getAttendanceHistory =
         );
 
       /**
-       * -----------------------------------------------------
+       * ---------------------------------------------------
        * RESPONSE
-       * -----------------------------------------------------
+       * ---------------------------------------------------
        */
 
       return res.status(200).json({
@@ -880,3 +986,313 @@ export const getAttendanceHistory =
       });
     }
   };
+
+/**
+ * =========================================================
+ * GET MY ATTENDANCE
+ * =========================================================
+ *
+ * STUDENT
+ *
+ * GET
+ * /api/attendance/my
+ *
+ * Optional query:
+ *
+ * ?course=COURSE_ID
+ * ?semester=SEMESTER_ID
+ *
+ * =========================================================
+ */
+
+export const getMyAttendance = async (
+  req: AuthRequest,
+  res: Response,
+) => {
+  try {
+    const studentId =
+      getAuthenticatedUserId(req);
+
+    if (!studentId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    /**
+     * -----------------------------------------------------
+     * QUERY PARAMETERS
+     * -----------------------------------------------------
+     */
+
+    const {
+      course,
+      semester,
+    } = req.query;
+
+    /**
+     * -----------------------------------------------------
+     * BUILD FILTER
+     * -----------------------------------------------------
+     */
+
+    const filter: {
+      student: string;
+      course?: string;
+      semester?: string;
+    } = {
+      student: studentId,
+    };
+
+    if (course !== undefined) {
+      if (typeof course !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid course",
+        });
+      }
+
+      if (
+        !mongoose.Types.ObjectId.isValid(
+          course,
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid course",
+        });
+      }
+
+      filter.course = course;
+    }
+
+    if (semester !== undefined) {
+      if (typeof semester !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid semester",
+        });
+      }
+
+      if (
+        !mongoose.Types.ObjectId.isValid(
+          semester,
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid semester",
+        });
+      }
+
+      filter.semester = semester;
+    }
+
+    /**
+     * -----------------------------------------------------
+     * GET ATTENDANCE
+     * -----------------------------------------------------
+     */
+
+    const attendance =
+      await Attendance.find(filter)
+        .populate(
+          "course",
+          "code title creditUnits level",
+        )
+        .populate(
+          "semester",
+          "name order session",
+        )
+        .sort({
+          date: -1,
+          createdAt: -1,
+        });
+
+    /**
+     * -----------------------------------------------------
+     * CALCULATE SUMMARY
+     * -----------------------------------------------------
+     */
+
+    let present = 0;
+    let absent = 0;
+    let late = 0;
+    let excused = 0;
+
+    for (const record of attendance) {
+      switch (record.status) {
+        case "present":
+          present += 1;
+          break;
+
+        case "absent":
+          absent += 1;
+          break;
+
+        case "late":
+          late += 1;
+          break;
+
+        case "excused":
+          excused += 1;
+          break;
+      }
+    }
+
+    const total = attendance.length;
+
+    /**
+     * Present, late and excused are considered
+     * attended records.
+     */
+    const attended =
+      present + late + excused;
+
+    const attendancePercentage =
+      total > 0
+        ? Math.round(
+            (attended / total) * 100,
+          )
+        : 0;
+
+    /**
+     * -----------------------------------------------------
+     * COURSE SUMMARY
+     * -----------------------------------------------------
+     */
+
+    const courseMap =
+      new Map<
+        string,
+        {
+          courseId: string;
+          code: string;
+          title: string;
+          total: number;
+          present: number;
+          absent: number;
+          late: number;
+          excused: number;
+          percentage: number;
+        }
+      >();
+
+    for (const record of attendance) {
+      const courseData =
+        record.course as unknown as
+          | PopulatedCourse
+          | null;
+
+      if (
+        !courseData ||
+        !courseData._id
+      ) {
+        continue;
+      }
+
+      const courseId =
+        courseData._id.toString();
+
+      if (!courseMap.has(courseId)) {
+        courseMap.set(courseId, {
+          courseId,
+          code:
+            courseData.code ??
+            "Unknown course",
+          title:
+            courseData.title ??
+            "Unknown course",
+          total: 0,
+          present: 0,
+          absent: 0,
+          late: 0,
+          excused: 0,
+          percentage: 0,
+        });
+      }
+
+      const summary =
+        courseMap.get(courseId)!;
+
+      summary.total += 1;
+
+      switch (record.status) {
+        case "present":
+          summary.present += 1;
+          break;
+
+        case "absent":
+          summary.absent += 1;
+          break;
+
+        case "late":
+          summary.late += 1;
+          break;
+
+        case "excused":
+          summary.excused += 1;
+          break;
+      }
+
+      const courseAttended =
+        summary.present +
+        summary.late +
+        summary.excused;
+
+      summary.percentage =
+        summary.total > 0
+          ? Math.round(
+              (courseAttended /
+                summary.total) *
+                100,
+            )
+          : 0;
+    }
+
+    const courseSummary =
+      Array.from(
+        courseMap.values(),
+      ).sort((a, b) =>
+        a.code.localeCompare(
+          b.code,
+        ),
+      );
+
+    /**
+     * -----------------------------------------------------
+     * RESPONSE
+     * -----------------------------------------------------
+     */
+
+    return res.status(200).json({
+      success: true,
+
+      summary: {
+        total,
+        present,
+        absent,
+        late,
+        excused,
+        attended,
+        attendancePercentage,
+      },
+
+      courseSummary,
+
+      attendance,
+    });
+  } catch (error) {
+    console.error(
+      "Get my attendance error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to load your attendance",
+    });
+  }
+};

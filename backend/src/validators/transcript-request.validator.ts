@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+/* =========================================================
+   CREATE TRANSCRIPT REQUEST
+========================================================= */
+
 export const createTranscriptRequestSchema =
   z.object({
     requestType: z.enum([
@@ -28,6 +32,10 @@ export const createTranscriptRequestSchema =
       )
       .optional(),
   });
+
+/* =========================================================
+   UPDATE TRANSCRIPT REQUEST STATUS
+========================================================= */
 
 export const updateTranscriptRequestStatusSchema =
   z
@@ -58,16 +66,54 @@ export const updateTranscriptRequestStatusSchema =
         )
         .optional(),
     })
-    .refine(
-      (data) =>
-        data.status !== "rejected" ||
-        Boolean(data.rejectionReason),
-      {
-        message:
-          "Rejection reason is required when rejecting a request.",
-        path: ["rejectionReason"],
+    .superRefine(
+      (data, ctx) => {
+        /* ===================================================
+           REJECTION REASON
+        =================================================== */
+
+        if (
+          data.status === "rejected" &&
+          !data.rejectionReason
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+
+            path: [
+              "rejectionReason",
+            ],
+
+            message:
+              "Rejection reason is required when rejecting a request.",
+          });
+        }
+
+        /* ===================================================
+           REJECTION REASON SHOULD NOT BE USED
+           FOR NON-REJECTED STATUS
+        =================================================== */
+
+        if (
+          data.status !== "rejected" &&
+          data.rejectionReason
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+
+            path: [
+              "rejectionReason",
+            ],
+
+            message:
+              "Rejection reason can only be provided when rejecting a request.",
+          });
+        }
       },
     );
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 export type CreateTranscriptRequestInput =
   z.infer<

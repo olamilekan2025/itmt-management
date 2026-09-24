@@ -31,7 +31,7 @@ export default function HeroSection() {
 
     const loadSlides = async () => {
       try {
-        const response = await fetch(`${API_URL}/hero-slides`, {
+        const response = await fetch(`${API_URL}/api/hero-slides`, {
           cache: "no-store",
         });
 

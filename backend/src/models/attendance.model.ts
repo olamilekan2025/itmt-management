@@ -22,7 +22,8 @@ export type AttendanceStatus =
  * =========================================================
  */
 
-export interface IAttendance extends Document {
+export interface IAttendance
+  extends Document {
   student: Types.ObjectId;
   lecturer: Types.ObjectId;
   course: Types.ObjectId;
@@ -104,9 +105,13 @@ const attendanceSchema =
        * DATE
        * -----------------------------------------------------
        *
-       * Attendance is recorded once per student per
-       * course/semester/date.
+       * Stored as normalized UTC midnight.
        *
+       * Example:
+       *
+       * 2026-09-15T00:00:00.000Z
+       *
+       * -----------------------------------------------------
        */
 
       date: {
@@ -145,6 +150,7 @@ const attendanceSchema =
         maxlength: 500,
       },
     },
+
     {
       timestamps: true,
     },
@@ -155,14 +161,9 @@ const attendanceSchema =
  * UNIQUE ATTENDANCE RECORD
  * =========================================================
  *
- * Prevent:
+ * A student can have only one attendance record for:
  *
- * Student A
- * Course X
- * Semester Y
- * Date Z
- *
- * from having multiple attendance records.
+ * student + course + semester + date
  *
  * =========================================================
  */
@@ -178,6 +179,47 @@ attendanceSchema.index(
     unique: true,
   },
 );
+
+/**
+ * =========================================================
+ * STUDENT ATTENDANCE INDEX
+ * =========================================================
+ *
+ * Optimizes:
+ *
+ * GET /attendance/my
+ *
+ * =========================================================
+ */
+
+attendanceSchema.index({
+  student: 1,
+  semester: 1,
+  date: -1,
+});
+
+attendanceSchema.index({
+  student: 1,
+  course: 1,
+  date: -1,
+});
+
+/**
+ * =========================================================
+ * LECTURER ATTENDANCE INDEX
+ * =========================================================
+ *
+ * Optimizes lecturer history/roster queries.
+ *
+ * =========================================================
+ */
+
+attendanceSchema.index({
+  lecturer: 1,
+  course: 1,
+  semester: 1,
+  date: -1,
+});
 
 /**
  * =========================================================

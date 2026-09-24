@@ -1,4 +1,6 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
+
+import crypto from "node:crypto";
 
 import { Types } from "mongoose";
 
@@ -7,24 +9,105 @@ import { z } from "zod";
 import type { AuthRequest } from "../middleware/auth.middleware.js";
 
 import Payment from "../models/Payment.js";
-
 import FeeStructure from "../models/FeeStructure.js";
-
 import User from "../models/User.js";
-
 import Semester from "../models/Semester.js";
 
-import AcademicSession from "../models/AcademicSession.js";
+/* =========================================================
+   TYPES
+========================================================= */
 
-import Programme from "../models/Programme.js";
+interface PaystackInitializeResponse {
+  status: boolean;
+  message: string;
+  data?: {
+    authorization_url: string;
+    access_code: string;
+    reference: string;
+  };
+}
 
-import AuditLog from "../models/AuditLog.js";
+interface PaystackVerifyData {
+  id: number;
+  status: string;
+  reference: string;
+  amount: number;
+  currency: string;
+  paid_at?: string;
+  transaction_date?: string;
+  channel?: string;
+  fees?: number;
+  gateway_response?: string;
+  metadata?: unknown;
+  customer?: {
+    email?: string;
+    first_name?: string;
+    last_name?: string;
+  };
+}
+
+interface PaystackVerifyResponse {
+  status: boolean;
+  message: string;
+  data?: PaystackVerifyData;
+}
+
+interface PaystackWebhookBody {
+  event?: string;
+  data?: PaystackVerifyData;
+}
+
+interface FeeCategoryInfo {
+  _id?: unknown;
+  name?: string;
+  code?: string;
+  description?: string;
+}
+
+interface FeeStructureInfo {
+  _id: unknown;
+  programme: unknown;
+  level: string;
+  semester: unknown;
+  amount: number;
+  description?: string;
+  feeCategory?: FeeCategoryInfo | unknown;
+}
+
+interface StudentInfo {
+  _id: Types.ObjectId;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  matricNumber?: string;
+  programme?: Types.ObjectId;
+  department?: Types.ObjectId;
+  level?: string;
+  academicSession?: Types.ObjectId;
+}
+
+interface StudentStatusInfo {
+  isActive?: boolean;
+  isSuspended?: boolean;
+}
+
+interface FeeGroup {
+  programme: string;
+  level: string;
+  semester: string;
+  amount: number;
+}
+
+/* =========================================================
+   VALIDATION
+========================================================= */
 
 const objectId = z
   .string()
   .regex(/^[a-f\d]{24}$/i, "Invalid ID");
 
-const recordPaymentSchema = z.object({
+const paymentSchema = z.object({
   student: objectId,
 
   semester: objectId,
@@ -35,18 +118,104 @@ const recordPaymentSchema = z.object({
 
   department: objectId.optional(),
 
-  amount: z.number().positive(),
+  amount: z.number().finite().positive(),
 
-  currency: z.string().default("NGN").optional(),
+  currency: z
+    .string()
+    .trim()
+    .min(1)
+    .max(10)
+    .default("NGN"),
 
-  method: z
+  method: z.enum([
+    "cash",
+    "bank_transfer",
+    "card",
+    "other",
+  ]),
+
+  purpose: z.enum([
+    "tuition",
+    "registration",
+    "examination",
+    "acceptance",
+    "transcript",
+    "certificate",
+    "hostel",
+    "other",
+  ]),
+
+  paymentReference: z
+    .string()
+    .trim()
+    .min(2)
+    .max(100),
+
+  invoiceNumber: z
+    .string()
+    .trim()
+    .max(100)
+    .optional(),
+
+  paymentProvider: z
+    .string()
+    .trim()
+    .max(100)
+    .optional(),
+
+  providerTransactionRef: z
+    .string()
+    .trim()
+    .max(150)
+    .optional(),
+
+  status: z
     .enum([
-      "cash",
-      "bank_transfer",
-      "card",
-      "other",
+      "pending",
+      "successful",
+      "failed",
+      "refunded",
+      "cancelled",
     ])
-    .default("cash"),
+    .optional(),
+
+  notes: z
+    .string()
+    .trim()
+    .max(1000)
+    .optional(),
+
+  paidAt: z
+    .string()
+    .datetime()
+    .optional(),
+
+  receiptUrl: z
+    .string()
+    .trim()
+    .url()
+    .optional(),
+
+  metadata: z
+    .record(z.string(), z.unknown())
+    .optional(),
+});
+
+const paystackInitializeSchema = z.object({
+  semester: objectId,
+
+  amount: z
+    .number()
+    .finite()
+    .positive()
+    .refine(
+      (value) =>
+        Number.isFinite(value) &&
+        Math.abs(
+          value * 100 - Math.round(value * 100),
+        ) < 1e-8,
+      "Amount must have at most two decimal places",
+    ),
 
   purpose: z
     .enum([
@@ -60,152 +229,273 @@ const recordPaymentSchema = z.object({
       "other",
     ])
     .default("tuition"),
-
-  paymentReference: z.string().trim().min(3).max(50),
-
-  invoiceNumber: z.string().trim().optional(),
-
-  paymentProvider: z.string().trim().optional(),
-
-  providerTransactionRef: z.string().trim().optional(),
-
-  status: z
-    .enum([
-      "pending",
-      "successful",
-      "failed",
-      "refunded",
-      "cancelled",
-    ])
-    .default("successful"),
-
-  notes: z.string().trim().optional(),
 });
 
-/**
- * Empty finance summary.
- */
-const EMPTY_DASHBOARD_SUMMARY = {
-  totalRevenue: 0,
-  todayRevenue: 0,
-  monthlyRevenue: 0,
-  totalPayments: 0,
-  outstandingAmount: 0,
-  studentsWithOutstanding: 0,
-};
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function getPaystackSecretKey(): string {
+  const key = process.env.PAYSTACK_SECRET_KEY;
+
+  if (!key) {
+    throw new Error(
+      "PAYSTACK_SECRET_KEY is not configured",
+    );
+  }
+
+  return key;
+}
+
+function getFrontendUrl(): string {
+  const url =
+    process.env.FRONTEND_URL ||
+    "http://localhost:3000";
+
+  return url.replace(/\/+$/, "");
+}
 
 /**
- * Escape user input before creating a RegExp.
+ * Normalizes level values so:
+ *
+ * ND1
+ * ND 1
+ * ND-1
+ * ND_1
+ * nd 1
+ *
+ * are treated as the same academic level.
+ *
+ * This does NOT convert unrelated values such as:
+ * 100 -> ND1
  */
-function escapeRegex(value: string) {
+function normalizeLevel(
+  level?: string | null,
+): string {
+  return String(level ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, "");
+}
+
+function generatePaymentReference(): string {
+  const timestamp = Date.now()
+    .toString(36)
+    .toUpperCase();
+
+  const random = crypto
+    .randomBytes(4)
+    .toString("hex")
+    .toUpperCase();
+
+  return `ITMT-PAY-${timestamp}-${random}`;
+}
+
+function amountToKobo(
+  amount: number,
+): number {
+  return Math.round(amount * 100);
+}
+
+function mapPaystackChannelToMethod(
+  channel?: string,
+):
+  | "cash"
+  | "bank_transfer"
+  | "card"
+  | "other" {
+  if (!channel) {
+    return "card";
+  }
+
+  const normalized =
+    channel.toLowerCase();
+
+  if (normalized === "card") {
+    return "card";
+  }
+
+  if (
+    normalized === "bank" ||
+    normalized === "bank_transfer" ||
+    normalized === "mobile_money" ||
+    normalized === "ussd"
+  ) {
+    return "bank_transfer";
+  }
+
+  return "other";
+}
+
+function getStudentDisplayName(
+  student: StudentInfo,
+): string {
+  if (student.name?.trim()) {
+    return student.name.trim();
+  }
+
+  const fallback =
+    `${student.firstName ?? ""} ${
+      student.lastName ?? ""
+    }`.trim();
+
+  return fallback || "Student";
+}
+
+function escapeRegex(
+  value: string,
+): string {
   return value.replace(
     /[.*+?^${}()|[\]\\]/g,
     "\\$&",
   );
 }
 
-/**
- * Calculate a student's balance for a semester.
- *
- * A student's total fee is the sum of ALL active
- * fee structures matching:
- *
- * - programme
- * - level
- * - semester
- *
- * This allows multiple fee categories such as:
- *
- * Tuition
- * Registration
- * ICT
- * Library
- * Examination
- * etc.
- */
+/* =========================================================
+   GET STUDENT
+========================================================= */
+
+async function getStudentForBalance(
+  studentId: string,
+) {
+  if (
+    !Types.ObjectId.isValid(studentId)
+  ) {
+    return null;
+  }
+
+  return User.findById(studentId)
+    .select(
+      "name email matricNumber programme level academicSession",
+    )
+    .lean<StudentInfo>();
+}
+
+/* =========================================================
+   COMPUTE STUDENT BALANCE
+========================================================= */
+
 async function computeBalance(
   studentId: string,
   semesterId: string,
 ) {
+  const emptyBalance = {
+    feeAmount: 0,
+    totalPaid: 0,
+    balance: 0,
+    outstanding: 0,
+    overpayment: 0,
+    hasFeeStructure: false,
+    feeBreakdown: [],
+  };
+
   if (
     !Types.ObjectId.isValid(studentId) ||
     !Types.ObjectId.isValid(semesterId)
   ) {
-    return {
-      feeAmount: 0,
-      totalPaid: 0,
-      balance: 0,
-      outstanding: 0,
-      overpayment: 0,
-      hasFeeStructure: false,
-    };
+    return emptyBalance;
   }
 
-  /**
-   * Get the student programme and level.
-   */
-  const student = await User.findById(studentId)
-    .select("programme level")
-    .lean();
+  const student =
+    await User.findById(studentId)
+      .select("programme level")
+      .lean();
 
   if (
     !student ||
     !student.programme ||
     !student.level
   ) {
-    return {
-      feeAmount: 0,
-      totalPaid: 0,
-      balance: 0,
-      outstanding: 0,
-      overpayment: 0,
-      hasFeeStructure: false,
-    };
+    return emptyBalance;
   }
 
   const semesterObjectId =
     new Types.ObjectId(semesterId);
 
-  /**
-   * Find ALL active fee structures for:
+  /*
+   * Query by programme + semester first.
+   * Level is normalized in JavaScript so:
    *
-   * programme + level + semester
+   * ND1
+   * ND 1
+   * ND-1
    *
-   * We intentionally use find() instead of findOne()
-   * because there can now be multiple fee categories.
+   * all match.
    */
-  const feeStructures =
+  const allFeeStructures =
     await FeeStructure.find({
       programme: student.programme,
-      level: student.level,
       semester: semesterObjectId,
       isActive: true,
     })
-      .select("amount")
-      .lean();
+      .select(
+        "programme level semester feeCategory amount description",
+      )
+      .populate(
+        "feeCategory",
+        "name code description",
+      )
+      .lean<FeeStructureInfo[]>();
 
-  /**
-   * Sum all applicable fee categories.
+  const normalizedStudentLevel =
+    normalizeLevel(student.level);
+
+  const feeStructures =
+    allFeeStructures.filter(
+      (fee) =>
+        normalizeLevel(fee.level) ===
+        normalizedStudentLevel,
+    );
+
+  /*
+   * Sum ALL active fee structures.
    *
-   * Example:
-   *
-   * Tuition       = 100,000
-   * Registration   = 20,000
-   * ICT            = 10,000
-   *
-   * Total fee     = 130,000
+   * This allows:
+   * Tuition
+   * Acceptance
+   * Examination
+   * Library
+   * Registration
+   * etc.
    */
   const feeAmount =
     feeStructures.reduce(
       (total, fee) =>
-        total + (Number(fee.amount) || 0),
+        total +
+        (Number(fee.amount) || 0),
       0,
     );
 
-  /**
-   * Calculate all payments made by the student
-   * for this semester.
-   */
+  const feeBreakdown =
+    feeStructures.map((fee) => {
+      const category =
+        fee.feeCategory &&
+        typeof fee.feeCategory ===
+          "object"
+          ? (fee.feeCategory as FeeCategoryInfo)
+          : undefined;
+
+      return {
+        _id: String(fee._id),
+
+        category:
+          category?.name ??
+          "Other Fees",
+
+        code:
+          category?.code ??
+          "OTHER",
+
+        amount:
+          Number(fee.amount) || 0,
+
+        description:
+          fee.description ??
+          category?.description ??
+          "",
+      };
+    });
+
   const paymentResult =
     await Payment.aggregate([
       {
@@ -213,7 +503,10 @@ async function computeBalance(
           student:
             new Types.ObjectId(studentId),
 
-          semester: semesterObjectId,
+          semester:
+            semesterObjectId,
+
+          status: "successful",
         },
       },
 
@@ -233,9 +526,6 @@ async function computeBalance(
       paymentResult[0]?.totalPaid,
     ) || 0;
 
-  /**
-   * Calculate balance.
-   */
   const balance =
     feeAmount - totalPaid;
 
@@ -246,183 +536,142 @@ async function computeBalance(
 
     balance,
 
-    outstanding: Math.max(
-      balance,
-      0,
-    ),
+    outstanding:
+      Math.max(balance, 0),
 
-    overpayment: Math.max(
-      -balance,
-      0,
-    ),
+    overpayment:
+      Math.max(-balance, 0),
 
     hasFeeStructure:
       feeStructures.length > 0,
+
+    feeBreakdown,
   };
 }
 
-/**
- * Finance/Admin records a payment for a student.
- */
+/* =========================================================
+   RECORD PAYMENT
+   FINANCE / ADMIN MANUAL PAYMENT
+========================================================= */
+
 export async function recordPayment(
   req: AuthRequest,
   res: Response,
 ) {
   try {
     const data =
-      recordPaymentSchema.parse(
-        req.body,
-      );
+      paymentSchema.parse(req.body);
 
-    /**
-     * Verify student.
-     */
     const student =
-      await User.findOne({
-        _id: data.student,
-        role: "student",
-      });
+      await User.findById(data.student)
+        .select(
+          "name email matricNumber programme level academicSession",
+        )
+        .lean<StudentInfo>();
 
     if (!student) {
-      return res.status(400).json({
+      return res.status(404).json({
         success: false,
         message: "Student not found",
       });
     }
 
-    /**
-     * Verify semester.
-     */
     const semester =
       await Semester.findById(
         data.semester,
-      );
+      ).lean();
 
     if (!semester) {
-      return res.status(400).json({
+      return res.status(404).json({
         success: false,
         message: "Semester not found",
       });
     }
 
-    /**
-     * Verify academic session if provided.
-     */
-    if (data.academicSession) {
-      const session = await AcademicSession.findById(data.academicSession);
-      if (!session) {
-        return res.status(400).json({
-          success: false,
-          message: "Academic session not found",
-        });
-      }
-    }
+    const paymentReference =
+      data.paymentReference
+        .trim()
+        .toUpperCase();
 
-    /**
-     * Verify programme if provided.
-     */
-    if (data.programme) {
-      const programme = await Programme.findById(data.programme);
-      if (!programme) {
-        return res.status(400).json({
-          success: false,
-          message: "Programme not found",
-        });
-      }
-    }
-
-    /**
-     * Check for duplicate payment reference.
-     */
-    const existingPayment = await Payment.findOne({
-      paymentReference: data.paymentReference.toUpperCase(),
-    });
+    const existingPayment =
+      await Payment.findOne({
+        paymentReference,
+      });
 
     if (existingPayment) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment reference already exists",
-      });
-    }
-
-    /**
-     * Verify authenticated finance/admin user.
-     */
-    if (!req.user?.userId) {
-      return res.status(401).json({
+      return res.status(409).json({
         success: false,
         message:
-          "Authenticated user not found",
+          "Payment reference already exists",
       });
     }
 
-    const recordingUser = await User.findById(req.user.userId);
-    if (!recordingUser) {
-      return res.status(401).json({
-        success: false,
-        message: "Recording user not found",
-      });
-    }
+    const status =
+      data.status ?? "successful";
 
-    /**
-     * Create payment.
-     */
     const payment =
       await Payment.create({
-        student: data.student,
-        studentName: student.name,
-        matricNumber: student.matricNumber,
-        semester: data.semester,
-        academicSession: data.academicSession,
-        programme: data.programme,
-        department: data.department,
-        amount: data.amount,
-        currency: data.currency || "NGN",
-        method: data.method,
-        purpose: data.purpose,
-        paymentReference: data.paymentReference.toUpperCase(),
-        invoiceNumber: data.invoiceNumber,
-        paymentProvider: data.paymentProvider,
-        providerTransactionRef: data.providerTransactionRef,
-        status: data.status,
-        notes: data.notes,
-        recordedBy: req.user.userId,
-        paidAt: data.status === "successful" ? new Date() : undefined,
+        ...data,
+
+        paymentReference,
+
+        currency:
+          data.currency
+            .trim()
+            .toUpperCase(),
+
+        studentName:
+          getStudentDisplayName(student),
+
+        matricNumber:
+          student.matricNumber,
+
+        programme:
+          data.programme ??
+          student.programme,
+
+        academicSession:
+          data.academicSession ??
+          student.academicSession,
+
+        status,
+
+        recordedBy:
+          req.user?.userId,
+
+        paidAt:
+          status === "successful"
+            ? data.paidAt
+              ? new Date(data.paidAt)
+              : new Date()
+            : undefined,
       });
 
-    /**
-     * Log audit.
-     */
-    await AuditLog.create({
-      actor: req.user.userId,
-      actorName: recordingUser.name,
-      actorEmail: recordingUser.email,
-      actorRole: recordingUser.role,
-      action: "CREATE",
-      module: "PAYMENTS",
-      description: `Recorded payment of ${data.currency || "NGN"} ${data.amount} for student ${student.name}`,
-      targetType: "Payment",
-      targetId: String(payment._id),
-      status: "success",
-      metadata: {
-        studentId: data.student,
-        amount: data.amount,
-        purpose: data.purpose,
-        paymentReference: data.paymentReference,
-      },
-    });
-
-    /**
-     * Recalculate balance after payment.
-     *
-     * computeBalance() now includes ALL fee
-     * categories.
-     */
-    const balance =
-      await computeBalance(
-        data.student,
-        data.semester,
-      );
+    const populatedPayment =
+      await Payment.findById(
+        payment._id,
+      )
+        .populate(
+          "student",
+          "name email matricNumber",
+        )
+        .populate(
+          "semester",
+          "name order",
+        )
+        .populate(
+          "academicSession",
+          "name",
+        )
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "department",
+          "name code",
+        )
+        .lean();
 
     return res.status(201).json({
       success: true,
@@ -430,12 +679,13 @@ export async function recordPayment(
       message:
         "Payment recorded successfully",
 
-      payment,
-
-      balance,
+      payment:
+        populatedPayment,
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
+    if (
+      error instanceof z.ZodError
+    ) {
       return res.status(400).json({
         success: false,
 
@@ -445,6 +695,21 @@ export async function recordPayment(
         errors:
           error.flatten()
             .fieldErrors,
+      });
+    }
+
+    if (
+      (
+        error as {
+          code?: number;
+        }
+      ).code === 11000
+    ) {
+      return res.status(409).json({
+        success: false,
+
+        message:
+          "Payment reference already exists",
       });
     }
 
@@ -462,206 +727,121 @@ export async function recordPayment(
   }
 }
 
-/**
- * Finance/Admin views payments with filtering and pagination.
- *
- * Optional query parameters:
- * ?student=STUDENT_ID
- * ?semester=SEMESTER_ID
- * ?status=STATUS
- * ?purpose=PURPOSE
- * ?method=METHOD
- * ?search=SEARCH_TERM
- * ?page=PAGE_NUMBER
- * ?limit=LIMIT
- * ?from=START_DATE
- * ?to=END_DATE
- */
+/* =========================================================
+   GET PAYMENTS
+========================================================= */
+
 export async function getPayments(
-  req: AuthRequest,
+  req: Request,
   res: Response,
 ) {
   try {
-    const student =
-      typeof req.query.student ===
-      "string"
-        ? req.query.student.trim()
-        : undefined;
+    const {
+      student,
+      semester,
+      status,
+      method,
+      purpose,
+      search,
+    } = req.query;
 
-    const semester =
-      typeof req.query.semester ===
-      "string"
-        ? req.query.semester.trim()
-        : undefined;
-
-    const status =
-      typeof req.query.status ===
-      "string"
-        ? req.query.status.trim()
-        : undefined;
-
-    const purpose =
-      typeof req.query.purpose ===
-      "string"
-        ? req.query.purpose.trim()
-        : undefined;
-
-    const method =
-      typeof req.query.method ===
-      "string"
-        ? req.query.method.trim()
-        : undefined;
-
-    const search =
-      typeof req.query.search ===
-      "string"
-        ? req.query.search.trim()
-        : undefined;
-
-    const page = Math.max(
-      1,
-      parseInt(
-        typeof req.query.page === "string"
-          ? req.query.page
-          : "1",
-        10,
-      ),
-    );
-
-    const limit = Math.min(
-      100,
-      Math.max(
-        10,
-        parseInt(
-          typeof req.query.limit === "string"
-            ? req.query.limit
-            : "20",
-          10,
-        ),
-      ),
-    );
-
-    const from =
-      typeof req.query.from ===
-      "string"
-        ? req.query.from.trim()
-        : undefined;
-
-    const to =
-      typeof req.query.to ===
-      "string"
-        ? req.query.to.trim()
-        : undefined;
-
-    /**
-     * Validate IDs.
-     */
-    if (
-      student &&
-      !Types.ObjectId.isValid(student)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid student ID",
-      });
-    }
-
-    if (
-      semester &&
-      !Types.ObjectId.isValid(semester)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid semester ID",
-      });
-    }
-
-    /**
-     * Build query.
-     */
     const query: Record<
       string,
       unknown
     > = {};
 
-    if (student) {
+    if (
+      typeof student === "string"
+    ) {
+      if (
+        !Types.ObjectId.isValid(student)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid student ID",
+        });
+      }
+
       query.student =
         new Types.ObjectId(student);
     }
 
-    if (semester) {
+    if (
+      typeof semester === "string"
+    ) {
+      if (
+        !Types.ObjectId.isValid(
+          semester,
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid semester ID",
+        });
+      }
+
       query.semester =
         new Types.ObjectId(semester);
     }
 
-    if (status) {
+    if (
+      typeof status === "string"
+    ) {
       query.status = status;
     }
 
-    if (purpose) {
-      query.purpose = purpose;
-    }
-
-    if (method) {
+    if (
+      typeof method === "string"
+    ) {
       query.method = method;
     }
 
-    /**
-     * Date range filter.
-     */
-    if (from || to) {
-      const dateFilter: Record<string, unknown> = {};
-      if (from) {
-        dateFilter.$gte = new Date(from);
-      }
-      if (to) {
-        dateFilter.$lte = new Date(to);
-      }
-      query.createdAt = dateFilter;
+    if (
+      typeof purpose === "string"
+    ) {
+      query.purpose = purpose;
     }
 
-    /**
-     * Search filter.
-     */
-    if (search) {
+    if (
+      typeof search === "string" &&
+      search.trim()
+    ) {
       const searchRegex =
         new RegExp(
-          escapeRegex(search),
+          escapeRegex(search.trim()),
           "i",
         );
 
       query.$or = [
         {
-          paymentReference: searchRegex,
+          paymentReference:
+            searchRegex,
         },
+
         {
-          studentName: searchRegex,
+          invoiceNumber:
+            searchRegex,
         },
+
         {
-          matricNumber: searchRegex,
+          providerTransactionRef:
+            searchRegex,
         },
+
         {
-          invoiceNumber: searchRegex,
+          studentName:
+            searchRegex,
         },
+
         {
-          providerTransactionRef: searchRegex,
+          matricNumber:
+            searchRegex,
         },
       ];
     }
 
-    /**
-     * Get total count.
-     */
-    const total =
-      await Payment.countDocuments(
-        query,
-      );
-
-    /**
-     * Get payments with pagination.
-     */
     const payments =
       await Payment.find(query)
         .populate(
@@ -684,35 +864,14 @@ export async function getPayments(
           "department",
           "name code",
         )
-        .populate(
-          "recordedBy",
-          "name",
-        )
-        .populate(
-          "verifiedBy",
-          "name",
-        )
         .sort({
           createdAt: -1,
         })
-        .skip((page - 1) * limit)
-        .limit(limit)
         .lean();
-
-    const totalPages =
-      Math.ceil(total / limit);
 
     return res.status(200).json({
       success: true,
-
       payments,
-
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages,
-      },
     });
   } catch (error) {
     console.error(
@@ -729,20 +888,12 @@ export async function getPayments(
   }
 }
 
-/**
- * Finance/Admin views all students and their
- * fee/payment status for a semester.
- *
- * Required:
- * ?semester=SEMESTER_ID
- *
- * Optional:
- * ?programme=PROGRAMME_ID
- * ?level=LEVEL
- * ?search=SEARCH
- */
+/* =========================================================
+   GET STUDENTS FEES
+========================================================= */
+
 export async function getStudentsFees(
-  req: AuthRequest,
+  req: Request,
   res: Response,
 ) {
   try {
@@ -752,27 +903,6 @@ export async function getStudentsFees(
         ? req.query.semester.trim()
         : undefined;
 
-    const programmeId =
-      typeof req.query.programme ===
-      "string"
-        ? req.query.programme.trim()
-        : undefined;
-
-    const search =
-      typeof req.query.search ===
-      "string"
-        ? req.query.search.trim()
-        : undefined;
-
-    const level =
-      typeof req.query.level ===
-      "string"
-        ? req.query.level.trim()
-        : undefined;
-
-    /**
-     * Semester is required.
-     */
     if (!semesterId) {
       return res.status(400).json({
         success: false,
@@ -795,28 +925,9 @@ export async function getStudentsFees(
       });
     }
 
-    if (
-      programmeId &&
-      !Types.ObjectId.isValid(
-        programmeId,
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-
-        message:
-          "Invalid programme ID",
-      });
-    }
-
     const semesterObjectId =
-      new Types.ObjectId(
-        semesterId,
-      );
+      new Types.ObjectId(semesterId);
 
-    /**
-     * Verify semester exists.
-     */
     const semester =
       await Semester.findById(
         semesterObjectId,
@@ -831,52 +942,10 @@ export async function getStudentsFees(
       });
     }
 
-    /**
-     * Build student filter.
-     */
-    const studentFilter: Record<
-      string,
-      unknown
-    > = {
-      role: "student",
-    };
-
-    if (programmeId) {
-      studentFilter.programme =
-        new Types.ObjectId(
-          programmeId,
-        );
-    }
-
-    if (level) {
-      studentFilter.level = level;
-    }
-
-    if (search) {
-      const searchRegex =
-        new RegExp(
-          escapeRegex(search),
-          "i",
-        );
-
-      studentFilter.$or = [
-        {
-          name: searchRegex,
-        },
-        {
-          email: searchRegex,
-        },
-        {
-          matricNumber: searchRegex,
-        },
-      ];
-    }
-
-    /**
-     * Get students.
-     */
     const students =
-      await User.find(studentFilter)
+      await User.find({
+        role: "student",
+      })
         .select(
           "name email matricNumber programme level",
         )
@@ -884,15 +953,8 @@ export async function getStudentsFees(
           "programme",
           "name code",
         )
-        .sort({
-          name: 1,
-        })
         .lean();
 
-    /**
-     * Get ALL active fee structures
-     * for this semester.
-     */
     const feeStructures =
       await FeeStructure.find({
         semester:
@@ -901,20 +963,47 @@ export async function getStudentsFees(
         isActive: true,
       })
         .select(
-          "programme level amount description",
+          "programme level amount feeCategory",
+        )
+        .populate(
+          "feeCategory",
+          "name code",
         )
         .lean();
 
-    /**
-     * Aggregate all payments for this
-     * semester in one database query.
+    /*
+     * Key:
+     *
+     * programme + normalized level
      */
+    const feeMap =
+      new Map<string, number>();
+
+    for (
+      const fee of feeStructures
+    ) {
+      const key =
+        `${String(
+          fee.programme,
+        )}_${normalizeLevel(
+          fee.level,
+        )}`;
+
+      feeMap.set(
+        key,
+        (feeMap.get(key) ?? 0) +
+          (Number(fee.amount) || 0),
+      );
+    }
+
     const payments =
       await Payment.aggregate([
         {
           $match: {
             semester:
               semesterObjectId,
+
+            status: "successful",
           },
         },
 
@@ -929,134 +1018,72 @@ export async function getStudentsFees(
         },
       ]);
 
-    /**
-     * studentId -> total paid.
-     */
     const paymentMap =
       new Map<string, number>();
 
-    for (const payment of payments) {
+    for (
+      const payment of payments
+    ) {
       paymentMap.set(
         String(payment._id),
-
-        Number(
-          payment.totalPaid,
-        ) || 0,
+        Number(payment.totalPaid) || 0,
       );
     }
 
-    /**
-     * programmeId:level -> TOTAL fee amount.
-     *
-     * Important:
-     *
-     * Multiple fee categories must be
-     * added together.
-     */
-    const feeMap =
-      new Map<string, number>();
-
-    for (const fee of feeStructures) {
-      const key =
-        `${String(
-          fee.programme,
-        )}:${String(fee.level)}`;
-
-      const current =
-        feeMap.get(key) ?? 0;
-
-      feeMap.set(
-        key,
-
-        current +
-          (Number(fee.amount) || 0),
-      );
-    }
-
-    /**
-     * Build student fee records.
-     */
-    const studentsFees =
+    const records =
       students.map((student) => {
-        const programme =
+        const programmeId =
           student.programme &&
           typeof student.programme ===
-            "object"
-            ? student.programme
-            : null;
+            "object" &&
+          "_id" in student.programme
+            ? student.programme._id
+            : student.programme;
 
-        const programmeIdValue =
-          programme
-            ? String(
-                programme._id,
-              )
-            : student.programme
-              ? String(
-                  student.programme,
-                )
-              : "";
-
-        const levelValue =
-          student.level ?? "";
+        const key =
+          `${String(
+            programmeId,
+          )}_${normalizeLevel(
+            student.level,
+          )}`;
 
         const feeAmount =
-          feeMap.get(
-            `${programmeIdValue}:${levelValue}`,
-          ) ?? 0;
+          feeMap.get(key) ?? 0;
 
         const totalPaid =
           paymentMap.get(
             String(student._id),
           ) ?? 0;
 
-        const rawBalance =
+        const balance =
           feeAmount - totalPaid;
 
-        const outstanding =
-          Math.max(
-            rawBalance,
-            0,
-          );
-
-        const overpayment =
-          Math.max(
-            -rawBalance,
-            0,
-          );
-
         let status:
-          | "no_fee"
-          | "outstanding"
+          | "no_fee_structure"
+          | "unpaid"
           | "partial"
-          | "paid";
+          | "paid"
+          | "overpaid";
 
-        if (feeAmount <= 0) {
-          status = "no_fee";
+        if (feeAmount === 0) {
+          status =
+            "no_fee_structure";
         } else if (totalPaid <= 0) {
-          status = "outstanding";
+          status = "unpaid";
         } else if (
-          totalPaid >= feeAmount
+          totalPaid < feeAmount
+        ) {
+          status = "partial";
+        } else if (
+          totalPaid === feeAmount
         ) {
           status = "paid";
         } else {
-          status = "partial";
+          status = "overpaid";
         }
 
         return {
-          student: {
-            _id: student._id,
-
-            name: student.name,
-
-            email: student.email,
-
-            matricNumber:
-              student.matricNumber,
-
-            programme,
-
-            level: levelValue,
-          },
+          student,
 
           semester: {
             _id: semester._id,
@@ -1070,93 +1097,24 @@ export async function getStudentsFees(
 
           totalPaid,
 
-          outstanding,
+          balance,
 
-          overpayment,
+          outstanding:
+            Math.max(balance, 0),
+
+          overpayment:
+            Math.max(-balance, 0),
 
           status,
         };
       });
-
-    /**
-     * Calculate summary.
-     */
-    const summary =
-      studentsFees.reduce(
-        (acc, item) => {
-          acc.totalFees +=
-            item.feeAmount;
-
-          acc.totalPaid +=
-            item.totalPaid;
-
-          acc.totalOutstanding +=
-            item.outstanding;
-
-          if (
-            item.status === "paid"
-          ) {
-            acc.paidStudents += 1;
-          }
-
-          if (
-            item.status === "partial"
-          ) {
-            acc.partialStudents += 1;
-          }
-
-          if (
-            item.status ===
-            "outstanding"
-          ) {
-            acc.outstandingStudents +=
-              1;
-          }
-
-          if (
-            item.status === "no_fee"
-          ) {
-            acc.noFeeStudents += 1;
-          }
-
-          if (item.feeAmount > 0) {
-            acc.studentsWithFees +=
-              1;
-          }
-
-          return acc;
-        },
-
-        {
-          totalStudents:
-            studentsFees.length,
-
-          studentsWithFees: 0,
-
-          totalFees: 0,
-
-          totalPaid: 0,
-
-          totalOutstanding: 0,
-
-          paidStudents: 0,
-
-          partialStudents: 0,
-
-          outstandingStudents: 0,
-
-          noFeeStudents: 0,
-        },
-      );
 
     return res.status(200).json({
       success: true,
 
       semester,
 
-      studentsFees,
-
-      summary,
+      students: records,
     });
   } catch (error) {
     console.error(
@@ -1168,17 +1126,17 @@ export async function getStudentsFees(
       success: false,
 
       message:
-        "Unable to retrieve student fee records",
+        "Unable to retrieve student fees",
     });
   }
 }
 
-/**
- * Finance/Admin views a specific student's
- * balance for a semester.
- */
+/* =========================================================
+   GET STUDENT BALANCE
+========================================================= */
+
 export async function getStudentBalance(
-  req: AuthRequest,
+  req: Request,
   res: Response,
 ) {
   try {
@@ -1194,19 +1152,26 @@ export async function getStudentBalance(
         ? req.query.semester.trim()
         : undefined;
 
-    if (!studentId || !semesterId) {
+    if (!studentId) {
       return res.status(400).json({
         success: false,
 
         message:
-          "student and semester query parameters are required",
+          "student query parameter is required",
+      });
+    }
+
+    if (!semesterId) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "semester query parameter is required",
       });
     }
 
     if (
-      !Types.ObjectId.isValid(
-        studentId,
-      )
+      !Types.ObjectId.isValid(studentId)
     ) {
       return res.status(400).json({
         success: false,
@@ -1229,14 +1194,10 @@ export async function getStudentBalance(
       });
     }
 
-    /**
-     * Verify student.
-     */
     const student =
-      await User.findOne({
-        _id: studentId,
-        role: "student",
-      }).lean();
+      await getStudentForBalance(
+        studentId,
+      );
 
     if (!student) {
       return res.status(404).json({
@@ -1247,9 +1208,6 @@ export async function getStudentBalance(
       });
     }
 
-    /**
-     * Verify semester.
-     */
     const semester =
       await Semester.findById(
         semesterId,
@@ -1264,10 +1222,6 @@ export async function getStudentBalance(
       });
     }
 
-    /**
-     * computeBalance() now sums all
-     * applicable fee categories.
-     */
     const balance =
       await computeBalance(
         studentId,
@@ -1276,6 +1230,10 @@ export async function getStudentBalance(
 
     return res.status(200).json({
       success: true,
+
+      student,
+
+      semester,
 
       balance,
     });
@@ -1289,14 +1247,15 @@ export async function getStudentBalance(
       success: false,
 
       message:
-        "Unable to retrieve balance",
+        "Unable to retrieve student balance",
     });
   }
 }
 
-/**
- * Student views their own payment history.
- */
+/* =========================================================
+   GET MY PAYMENTS
+========================================================= */
+
 export async function getMyPayments(
   req: AuthRequest,
   res: Response,
@@ -1319,9 +1278,7 @@ export async function getMyPayments(
 
     if (
       semester &&
-      !Types.ObjectId.isValid(
-        semester,
-      )
+      !Types.ObjectId.isValid(semester)
     ) {
       return res.status(400).json({
         success: false,
@@ -1343,9 +1300,7 @@ export async function getMyPayments(
 
     if (semester) {
       query.semester =
-        new Types.ObjectId(
-          semester,
-        );
+        new Types.ObjectId(semester);
     }
 
     const payments =
@@ -1354,6 +1309,18 @@ export async function getMyPayments(
           "semester",
           "name order",
         )
+        .populate(
+          "academicSession",
+          "name",
+        )
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "department",
+          "name code",
+        )
         .sort({
           createdAt: -1,
         })
@@ -1361,7 +1328,6 @@ export async function getMyPayments(
 
     return res.status(200).json({
       success: true,
-
       payments,
     });
   } catch (error) {
@@ -1379,9 +1345,10 @@ export async function getMyPayments(
   }
 }
 
-/**
- * Student views their own balance.
- */
+/* =========================================================
+   GET MY BALANCE
+========================================================= */
+
 export async function getMyBalance(
   req: AuthRequest,
   res: Response,
@@ -1424,9 +1391,20 @@ export async function getMyBalance(
       });
     }
 
-    /**
-     * Verify semester.
-     */
+    const student =
+      await getStudentForBalance(
+        req.user.userId,
+      );
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+
+        message:
+          "Student profile not found",
+      });
+    }
+
     const semester =
       await Semester.findById(
         semesterId,
@@ -1441,10 +1419,6 @@ export async function getMyBalance(
       });
     }
 
-    /**
-     * computeBalance() now sums all
-     * applicable fee categories.
-     */
     const balance =
       await computeBalance(
         req.user.userId,
@@ -1453,6 +1427,10 @@ export async function getMyBalance(
 
     return res.status(200).json({
       success: true,
+
+      student,
+
+      semester,
 
       balance,
     });
@@ -1466,145 +1444,1188 @@ export async function getMyBalance(
       success: false,
 
       message:
-        "Unable to retrieve balance",
+        "Unable to retrieve student balance",
     });
   }
 }
 
-/**
- * Finance/Admin dashboard summary.
- *
- * Optional:
- * ?semester=SEMESTER_ID
- *
- * Returns:
- * - total revenue
- * - today's revenue
- * - current month's revenue
- * - total payment count
- * - outstanding amount
- * - students with outstanding fees
- * - payment method breakdown
- * - six-month revenue
- * - recent payments
- */
-export async function getFinanceDashboard(
+/* =========================================================
+   PAYSTACK: INITIALIZE STUDENT PAYMENT
+========================================================= */
+
+export async function initializePaystackPayment(
   req: AuthRequest,
   res: Response,
 ) {
+  /*
+   * IMPORTANT:
+   *
+   * Do NOT use:
+   *
+   * ReturnType<typeof Payment.create>
+   *
+   * Mongoose has multiple create() overloads and
+   * TypeScript can resolve the wrong overload.
+   *
+   * InstanceType<typeof Payment> represents the
+   * actual Payment document and gives us:
+   *
+   * payment._id
+   * payment.status
+   * payment.notes
+   * payment.metadata
+   * payment.save()
+   */
+  let payment:
+    | InstanceType<typeof Payment>
+    | null = null;
+
   try {
-    const now = new Date();
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        success: false,
 
-    const startOfToday =
-      new Date(now);
+        message:
+          "Authenticated user not found",
+      });
+    }
 
-    startOfToday.setHours(
-      0,
-      0,
-      0,
-      0,
-    );
-
-    const startOfMonth =
-      new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        1,
+    const data =
+      paystackInitializeSchema.parse(
+        req.body,
       );
 
-    const startOfSixMonthsAgo =
-      new Date(
-        now.getFullYear(),
-        now.getMonth() - 5,
-        1,
-      );
-
-    const semesterId =
-      typeof req.query.semester ===
-      "string"
-        ? req.query.semester.trim()
-        : undefined;
-
-    /**
-     * Validate optional semester.
-     */
-    if (
-      semesterId &&
-      !Types.ObjectId.isValid(
-        semesterId,
+    const student =
+      await User.findById(
+        req.user.userId,
       )
+        .select(
+          "name email matricNumber programme level academicSession isActive isSuspended",
+        )
+        .lean<
+          StudentInfo &
+            StudentStatusInfo
+        >();
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+
+        message:
+          "Student profile not found",
+      });
+    }
+
+    if (
+      student.isActive === false ||
+      student.isSuspended === true
+    ) {
+      return res.status(403).json({
+        success: false,
+
+        message:
+          "Your student account cannot make payments at this time",
+      });
+    }
+
+    if (!student.email?.trim()) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "A valid student email is required before payment",
+      });
+    }
+
+    const semester =
+      await Semester.findById(
+        data.semester,
+      ).lean();
+
+    if (!semester) {
+      return res.status(404).json({
+        success: false,
+
+        message:
+          "Semester not found",
+      });
+    }
+
+    /*
+     * Calculate current balance.
+     */
+    const balance =
+      await computeBalance(
+        req.user.userId,
+        data.semester,
+      );
+
+    if (!balance.hasFeeStructure) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "No fee structure has been configured for your programme and level for this semester",
+      });
+    }
+
+    if (balance.outstanding <= 0) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "You do not have any outstanding balance for this semester",
+      });
+    }
+
+    if (
+      data.amount >
+      balance.outstanding
     ) {
       return res.status(400).json({
         success: false,
 
         message:
-          "Invalid semester ID",
+          `Maximum payment allowed is ₦${balance.outstanding.toLocaleString(
+            "en-NG",
+            {
+              minimumFractionDigits: 2,
+
+              maximumFractionDigits: 2,
+            },
+          )}`,
+
+        outstanding:
+          balance.outstanding,
       });
     }
 
-    const semesterObjectId =
-      semesterId
-        ? new Types.ObjectId(
-            semesterId,
-          )
-        : undefined;
+    const amountInKobo =
+      amountToKobo(data.amount);
 
-    /**
-     * Verify semester exists when supplied.
+    if (amountInKobo <= 0) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "Invalid payment amount",
+      });
+    }
+
+    /*
+     * Generate unique local reference.
      */
-    if (semesterObjectId) {
-      const semester =
-        await Semester.findById(
-          semesterObjectId,
-        ).lean();
+    const reference =
+      generatePaymentReference();
 
-      if (!semester) {
-        return res.status(404).json({
+    /*
+     * Create PENDING local payment first.
+     *
+     * This is intentionally:
+     *
+     * pending
+     *
+     * and NOT successful.
+     */
+    payment =
+      new Payment({
+        student:
+          new Types.ObjectId(
+            req.user.userId,
+          ),
+
+        studentName:
+          getStudentDisplayName(student),
+
+        matricNumber:
+          student.matricNumber,
+
+        semester:
+          new Types.ObjectId(
+            data.semester,
+          ),
+
+        academicSession:
+          student.academicSession,
+
+        programme:
+          student.programme,
+
+        amount:
+          data.amount,
+
+        currency:
+          "NGN",
+
+        method:
+          "card",
+
+        purpose:
+          data.purpose,
+
+        paymentReference:
+          reference,
+
+        paymentProvider:
+          "paystack",
+
+        status:
+          "pending",
+
+        recordedBy:
+          new Types.ObjectId(
+            req.user.userId,
+          ),
+
+        metadata: {
+          source:
+            "student_portal",
+
+          paymentType:
+            "installment",
+
+          outstandingBeforePayment:
+            balance.outstanding,
+        },
+      });
+
+    await payment.save();
+
+    try {
+      const callbackUrl =
+        `${getFrontendUrl()}/dashboards/student/payments/callback?reference=${encodeURIComponent(
+          reference,
+        )}`;
+
+      /*
+       * Initialize Paystack.
+       */
+      const response =
+        await fetch(
+          "https://api.paystack.co/transaction/initialize",
+          {
+            method: "POST",
+
+            headers: {
+              Authorization:
+                `Bearer ${getPaystackSecretKey()}`,
+
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+              email:
+                student.email.trim(),
+
+              amount:
+                amountInKobo,
+
+              currency:
+                "NGN",
+
+              reference,
+
+              callback_url:
+                callbackUrl,
+
+              metadata: {
+                paymentId:
+                  String(
+                    payment._id,
+                  ),
+
+                studentId:
+                  String(
+                    req.user.userId,
+                  ),
+
+                semesterId:
+                  data.semester,
+
+                purpose:
+                  data.purpose,
+
+                amount:
+                  data.amount,
+
+                installment:
+                  true,
+              },
+            }),
+          },
+        );
+
+      const result =
+        (await response.json()) as PaystackInitializeResponse;
+
+      if (
+        !response.ok ||
+        !result.status ||
+        !result.data
+      ) {
+        payment.status =
+          "failed";
+
+        payment.notes =
+          result.message ||
+          "Paystack initialization failed";
+
+        await payment.save();
+
+        return res.status(502).json({
           success: false,
 
           message:
-            "Semester not found",
+            result.message ||
+            "Unable to initialize Paystack payment",
         });
       }
+
+      /*
+       * Store Paystack information.
+       *
+       * providerTransactionRef is NOT set here.
+       *
+       * The Paystack transaction ID is stored after
+       * successful verification/webhook.
+       */
+      payment.metadata = {
+        ...(payment.metadata ?? {}),
+
+        paystackAccessCode:
+          result.data.access_code,
+
+        paystackAuthorizationUrl:
+          result.data.authorization_url,
+
+        paystackReference:
+          result.data.reference,
+      };
+
+      await payment.save();
+
+      return res.status(201).json({
+        success: true,
+
+        message:
+          "Payment initialized successfully",
+
+        paymentId:
+          String(payment._id),
+
+        reference,
+
+        authorizationUrl:
+          result.data
+            .authorization_url,
+
+        accessCode:
+          result.data.access_code,
+
+        amount:
+          data.amount,
+
+        currency:
+          "NGN",
+
+        purpose:
+          data.purpose,
+
+        outstanding:
+          balance.outstanding,
+
+        balance,
+      });
+    } catch (paystackError) {
+      if (payment) {
+        payment.status =
+          "failed";
+
+        payment.notes =
+          paystackError instanceof
+          Error
+            ? paystackError.message
+            : "Unable to connect to Paystack";
+
+        await payment.save();
+      }
+
+      throw paystackError;
+    }
+  } catch (error) {
+    if (
+      error instanceof z.ZodError
+    ) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "Invalid payment details",
+
+        errors:
+          error.flatten()
+            .fieldErrors,
+      });
     }
 
-    /**
-     * Base payment filter.
+    console.error(
+      "Initialize Paystack payment error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+
+      message:
+        "Unable to initialize payment",
+    });
+  }
+}
+
+/* =========================================================
+   COMPLETE PAYSTACK PAYMENT
+
+   Used by:
+   - callback verification
+   - Paystack webhook
+
+   This function is intentionally idempotent.
+========================================================= */
+
+async function completePaystackPayment(
+  paystackData: PaystackVerifyData,
+) {
+  const reference =
+    paystackData.reference?.trim();
+
+  if (!reference) {
+    throw new Error(
+      "Paystack transaction reference is missing",
+    );
+  }
+
+  const payment =
+    await Payment.findOne({
+      paymentReference:
+        reference,
+    });
+
+  if (!payment) {
+    return {
+      found: false,
+
+      payment: null,
+
+      alreadySuccessful: false,
+    };
+  }
+
+  /*
+   * Validate reference before accepting
+   * the transaction.
+   */
+  if (
+    paystackData.reference !==
+    payment.paymentReference
+  ) {
+    throw new Error(
+      "Paystack reference does not match local payment",
+    );
+  }
+
+  /*
+   * Validate amount.
+   */
+  const expectedKobo =
+    amountToKobo(
+      Number(payment.amount),
+    );
+
+  if (
+    Number(paystackData.amount) !==
+    expectedKobo
+  ) {
+    payment.status =
+      "failed";
+
+    payment.notes =
+      "Paystack amount mismatch";
+
+    await payment.save();
+
+    throw new Error(
+      "Paystack payment amount does not match the local payment amount",
+    );
+  }
+
+  /*
+   * Validate currency.
+   */
+  if (
+    String(
+      paystackData.currency,
+    ).toUpperCase() !==
+    String(
+      payment.currency,
+    ).toUpperCase()
+  ) {
+    payment.status =
+      "failed";
+
+    payment.notes =
+      "Paystack currency mismatch";
+
+    await payment.save();
+
+    throw new Error(
+      "Paystack currency does not match the local payment currency",
+    );
+  }
+
+  /*
+   * Only successful Paystack transactions
+   * can become successful locally.
+   */
+  if (
+    paystackData.status !==
+    "success"
+  ) {
+    return {
+      found: true,
+
+      payment,
+
+      alreadySuccessful: false,
+
+      notSuccessful: true,
+    };
+  }
+
+  /*
+   * Idempotency.
+   *
+   * This is checked after validating:
+   * reference
+   * amount
+   * currency
+   * Paystack success status
+   */
+  if (
+    payment.status ===
+    "successful"
+  ) {
+    return {
+      found: true,
+
+      payment,
+
+      alreadySuccessful: true,
+
+      notSuccessful: false,
+    };
+  }
+
+  /*
+   * Mark successful.
+   */
+  payment.status =
+    "successful";
+
+  payment.method =
+    mapPaystackChannelToMethod(
+      paystackData.channel,
+    );
+
+  payment.paymentProvider =
+    "paystack";
+
+  payment.providerTransactionRef =
+    paystackData.id
+      ? String(paystackData.id)
+      : reference;
+
+  payment.paidAt =
+    paystackData.paid_at
+      ? new Date(
+          paystackData.paid_at,
+        )
+      : paystackData.transaction_date
+        ? new Date(
+            paystackData.transaction_date,
+          )
+        : new Date();
+
+  payment.verifiedAt =
+    new Date();
+
+  payment.notes =
+    undefined;
+
+  payment.metadata = {
+    ...(payment.metadata ?? {}),
+
+    paystackTransactionId:
+      paystackData.id,
+
+    paystackReference:
+      paystackData.reference,
+
+    paystackChannel:
+      paystackData.channel,
+
+    paystackFees:
+      paystackData.fees,
+
+    paystackStatus:
+      paystackData.status,
+
+    gatewayResponse:
+      paystackData.gateway_response,
+
+    verifiedAutomatically:
+      true,
+  };
+
+  await payment.save();
+
+  return {
+    found: true,
+
+    payment,
+
+    alreadySuccessful: false,
+
+    notSuccessful: false,
+  };
+}
+
+/* =========================================================
+   VERIFY PAYSTACK PAYMENT
+   STUDENT CALLBACK
+========================================================= */
+
+export async function verifyPaystackPayment(
+  req: AuthRequest,
+  res: Response,
+) {
+  try {
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        success: false,
+
+        message:
+          "Authenticated user not found",
+      });
+    }
+
+    const reference =
+      typeof req.body?.reference ===
+      "string"
+        ? req.body.reference.trim()
+        : "";
+
+    if (!reference) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "Paystack reference is required",
+      });
+    }
+
+    const localPayment =
+      await Payment.findOne({
+        paymentReference:
+          reference,
+
+        student:
+          new Types.ObjectId(
+            req.user.userId,
+          ),
+      });
+
+    if (!localPayment) {
+      return res.status(404).json({
+        success: false,
+
+        message:
+          "Payment record not found",
+      });
+    }
+
+    if (
+      localPayment.status ===
+      "successful"
+    ) {
+      const balance =
+        await computeBalance(
+          req.user.userId,
+
+          String(
+            localPayment.semester,
+          ),
+        );
+
+      return res.status(200).json({
+        success: true,
+
+        message:
+          "Payment has already been verified",
+
+        payment:
+          localPayment,
+
+        balance,
+      });
+    }
+
+    /*
+     * Verify directly with Paystack.
      */
-    const paymentMatch: Record<
-      string,
-      unknown
-    > = {};
+    const response =
+      await fetch(
+        `https://api.paystack.co/transaction/verify/${encodeURIComponent(
+          reference,
+        )}`,
+        {
+          method: "GET",
 
-    if (semesterObjectId) {
-      paymentMatch.semester =
-        semesterObjectId;
+          headers: {
+            Authorization:
+              `Bearer ${getPaystackSecretKey()}`,
+          },
+        },
+      );
+
+    const result =
+      (await response.json()) as PaystackVerifyResponse;
+
+    if (
+      !response.ok ||
+      !result.status ||
+      !result.data
+    ) {
+      return res.status(502).json({
+        success: false,
+
+        message:
+          result.message ||
+          "Unable to verify payment with Paystack",
+      });
     }
+
+    /*
+     * Validate reference.
+     */
+    if (
+      result.data.reference !==
+      localPayment.paymentReference
+    ) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "Paystack reference mismatch",
+      });
+    }
+
+    /*
+     * Do not mark unsuccessful Paystack
+     * transactions as successful.
+     */
+    if (
+      result.data.status !==
+      "success"
+    ) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          result.data.gateway_response ||
+          `Payment status is ${result.data.status}`,
+
+        status:
+          result.data.status,
+      });
+    }
+
+    /*
+     * completePaystackPayment()
+     * validates:
+     *
+     * - reference
+     * - amount
+     * - currency
+     * - success status
+     * - idempotency
+     */
+    const completed =
+      await completePaystackPayment(
+        result.data,
+      );
+
+    if (!completed.found) {
+      return res.status(404).json({
+        success: false,
+
+        message:
+          "Local payment record not found",
+      });
+    }
+
+    const payment =
+      await Payment.findById(
+        localPayment._id,
+      )
+        .populate(
+          "student",
+          "name email matricNumber",
+        )
+        .populate(
+          "semester",
+          "name order",
+        )
+        .populate(
+          "academicSession",
+          "name",
+        )
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "department",
+          "name code",
+        )
+        .lean();
+
+    const balance =
+      await computeBalance(
+        req.user.userId,
+
+        String(
+          localPayment.semester,
+        ),
+      );
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        "Payment verified successfully",
+
+      payment,
+
+      balance,
+    });
+  } catch (error) {
+    console.error(
+      "Verify Paystack payment error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unable to verify payment",
+    });
+  }
+}
+
+/* =========================================================
+   PAYSTACK WEBHOOK
+
+   IMPORTANT:
+   - NO authenticate middleware
+   - Requires rawBody
+   - Validates x-paystack-signature
+========================================================= */
+
+export async function paystackWebhook(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const secret =
+      process.env.PAYSTACK_SECRET_KEY;
+
+    if (!secret) {
+      console.error(
+        "PAYSTACK_SECRET_KEY is not configured",
+      );
+
+      return res.sendStatus(500);
+    }
+
+    const signature =
+      req.header(
+        "x-paystack-signature",
+      );
+
+    if (!signature) {
+      return res.sendStatus(401);
+    }
+
+    const rawBody =
+      (
+        req as Request & {
+          rawBody?: Buffer;
+        }
+      ).rawBody;
+
+    if (!rawBody) {
+      console.error(
+        "Paystack webhook raw body is missing",
+      );
+
+      return res.sendStatus(400);
+    }
+
+    /*
+     * Generate expected HMAC SHA512.
+     */
+    const expectedSignature =
+      crypto
+        .createHmac(
+          "sha512",
+          secret,
+        )
+        .update(rawBody)
+        .digest("hex");
+
+    const expectedBuffer =
+      Buffer.from(
+        expectedSignature,
+        "utf8",
+      );
+
+    const receivedBuffer =
+      Buffer.from(
+        signature.trim(),
+        "utf8",
+      );
+
+    /*
+     * timingSafeEqual throws when the
+     * buffer lengths are different.
+     */
+    if (
+      expectedBuffer.length !==
+      receivedBuffer.length
+    ) {
+      return res.sendStatus(401);
+    }
+
+    const valid =
+      crypto.timingSafeEqual(
+        expectedBuffer,
+        receivedBuffer,
+      );
+
+    if (!valid) {
+      return res.sendStatus(401);
+    }
+
+    const event =
+      req.body as PaystackWebhookBody;
+
+    /*
+     * Only process successful charge events.
+     */
+    if (
+      event.event !==
+      "charge.success"
+    ) {
+      return res.sendStatus(200);
+    }
+
+    if (!event.data?.reference) {
+      return res.sendStatus(200);
+    }
+
+    if (
+      event.data.status !==
+      "success"
+    ) {
+      return res.sendStatus(200);
+    }
+
+    try {
+      await completePaystackPayment(
+        event.data,
+      );
+    } catch (error) {
+      console.error(
+        "Paystack webhook payment processing error:",
+        error,
+      );
+    }
+
+    /*
+     * Valid webhook received.
+     *
+     * Return 200 so Paystack knows the event
+     * was received.
+     */
+    return res.sendStatus(200);
+  } catch (error) {
+    console.error(
+      "Paystack webhook error:",
+      error,
+    );
+
+    return res.sendStatus(500);
+  }
+}
+
+/* =========================================================
+   GET MY PAYMENT RECEIPT
+========================================================= */
+
+export async function getMyPaymentReceipt(
+  req: AuthRequest,
+  res: Response,
+) {
+  try {
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        success: false,
+
+        message:
+          "Authenticated user not found",
+      });
+    }
+
+    const reference =
+      typeof req.params.reference ===
+      "string"
+        ? req.params.reference.trim()
+        : "";
+
+    if (!reference) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "Payment reference is required",
+      });
+    }
+
+    const payment =
+      await Payment.findOne({
+        paymentReference:
+          reference,
+
+        student:
+          new Types.ObjectId(
+            req.user.userId,
+          ),
+      })
+        .populate(
+          "student",
+          "name email matricNumber",
+        )
+        .populate(
+          "semester",
+          "name order",
+        )
+        .populate(
+          "academicSession",
+          "name",
+        )
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "department",
+          "name code",
+        )
+        .lean();
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+
+        message:
+          "Payment receipt not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+
+      payment,
+    });
+  } catch (error) {
+    console.error(
+      "Get payment receipt error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+
+      message:
+        "Unable to retrieve payment receipt",
+    });
+  }
+}
+
+/* =========================================================
+   FINANCE DASHBOARD
+========================================================= */
+
+export async function getFinanceDashboard(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const today = new Date();
+
+    const startOfToday =
+      new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+      );
+
+    const startOfMonth =
+      new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        1,
+      );
+
+    const startOfSixMonths =
+      new Date(
+        today.getFullYear(),
+        today.getMonth() - 5,
+        1,
+      );
 
     const [
-      revenueResult,
-
-      todayResult,
-
-      monthlyResult,
-
-      paymentCount,
-
-      paymentMethods,
-
-      monthlyRevenue,
-
-      recentPayments,
-
+      totalRevenueResult,
+      todayRevenueResult,
+      monthlyRevenueResult,
+      totalPaymentsResult,
       outstandingResult,
+      paymentMethodsResult,
+      monthlyRevenue,
+      recentPayments,
     ] = await Promise.all([
-      /**
+      /*
        * Total revenue.
        */
       Payment.aggregate([
         {
-          $match:
-            paymentMatch,
+          $match: {
+            status: "successful",
+          },
         },
 
         {
@@ -1618,15 +2639,15 @@ export async function getFinanceDashboard(
         },
       ]),
 
-      /**
+      /*
        * Today's revenue.
        */
       Payment.aggregate([
         {
           $match: {
-            ...paymentMatch,
+            status: "successful",
 
-            createdAt: {
+            paidAt: {
               $gte: startOfToday,
             },
           },
@@ -1643,15 +2664,15 @@ export async function getFinanceDashboard(
         },
       ]),
 
-      /**
-       * Current month's revenue.
+      /*
+       * Monthly revenue.
        */
       Payment.aggregate([
         {
           $match: {
-            ...paymentMatch,
+            status: "successful",
 
-            createdAt: {
+            paidAt: {
               $gte: startOfMonth,
             },
           },
@@ -1668,20 +2689,26 @@ export async function getFinanceDashboard(
         },
       ]),
 
-      /**
-       * Number of payments.
+      /*
+       * Total successful payments.
        */
-      Payment.countDocuments(
-        paymentMatch,
-      ),
+      Payment.countDocuments({
+        status: "successful",
+      }),
 
-      /**
-       * Payment method breakdown.
+      /*
+       * Outstanding student balances.
+       */
+      getOutstandingAmount(),
+
+      /*
+       * Payment methods.
        */
       Payment.aggregate([
         {
-          $match:
-            paymentMatch,
+          $match: {
+            status: "successful",
+          },
         },
 
         {
@@ -1705,17 +2732,16 @@ export async function getFinanceDashboard(
         },
       ]),
 
-      /**
-       * Revenue for the last six months.
+      /*
+       * Six-month revenue.
        */
       Payment.aggregate([
         {
           $match: {
-            ...paymentMatch,
+            status: "successful",
 
-            createdAt: {
-              $gte:
-                startOfSixMonthsAgo,
+            paidAt: {
+              $gte: startOfSixMonths,
             },
           },
         },
@@ -1724,22 +2750,16 @@ export async function getFinanceDashboard(
           $group: {
             _id: {
               year: {
-                $year:
-                  "$createdAt",
+                $year: "$paidAt",
               },
 
               month: {
-                $month:
-                  "$createdAt",
+                $month: "$paidAt",
               },
             },
 
             amount: {
               $sum: "$amount",
-            },
-
-            count: {
-              $sum: 1,
             },
           },
         },
@@ -1753,10 +2773,10 @@ export async function getFinanceDashboard(
         },
       ]),
 
-      /**
+      /*
        * Recent payments.
        */
-      Payment.find(paymentMatch)
+      Payment.find()
         .populate(
           "student",
           "name email matricNumber",
@@ -1765,383 +2785,61 @@ export async function getFinanceDashboard(
           "semester",
           "name order",
         )
-        .populate(
-          "recordedBy",
-          "name",
-        )
         .sort({
           createdAt: -1,
         })
         .limit(10)
         .lean(),
-
-      /**
-       * Outstanding fee calculation.
-       *
-       * Total student fee =
-       * sum of ALL active fee structures
-       * matching:
-       *
-       * programme + level + semester
-       *
-       * Outstanding =
-       * total fee - total payments
-       */
-      User.aggregate([
-        {
-          $match: {
-            role: "student",
-
-            programme: {
-              $exists: true,
-
-              $ne: null,
-            },
-
-            level: {
-              $exists: true,
-
-              $ne: null,
-            },
-          },
-        },
-
-        /**
-         * Find ALL matching active
-         * fee structures.
-         */
-        {
-          $lookup: {
-            from: "feestructures",
-
-            let: {
-              programmeId:
-                "$programme",
-
-              studentLevel:
-                "$level",
-            },
-
-            pipeline: [
-              {
-                $match: {
-                  isActive: true,
-
-                  ...(semesterObjectId
-                    ? {
-                        semester:
-                          semesterObjectId,
-                      }
-                    : {}),
-
-                  $expr: {
-                    $and: [
-                      {
-                        $eq: [
-                          "$programme",
-                          "$$programmeId",
-                        ],
-                      },
-
-                      {
-                        $eq: [
-                          "$level",
-                          "$$studentLevel",
-                        ],
-                      },
-                    ],
-                  },
-                },
-              },
-
-              /**
-               * Sum ALL fee categories.
-               */
-              {
-                $group: {
-                  _id: null,
-
-                  totalFee: {
-                    $sum: "$amount",
-                  },
-                },
-              },
-            ],
-
-            as: "feeTotals",
-          },
-        },
-
-        /**
-         * Extract total fee.
-         */
-        {
-          $addFields: {
-            totalFee: {
-              $ifNull: [
-                {
-                  $arrayElemAt: [
-                    "$feeTotals.totalFee",
-                    0,
-                  ],
-                },
-
-                0,
-              ],
-            },
-          },
-        },
-
-        /**
-         * Ignore students without
-         * an applicable fee structure.
-         */
-        {
-          $match: {
-            totalFee: {
-              $gt: 0,
-            },
-          },
-        },
-
-        /**
-         * Find payments for each student.
-         */
-        {
-          $lookup: {
-            from: "payments",
-
-            let: {
-              studentId: "$_id",
-            },
-
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $and: [
-                      {
-                        $eq: [
-                          "$student",
-                          "$$studentId",
-                        ],
-                      },
-
-                      ...(semesterObjectId
-                        ? [
-                            {
-                              $eq: [
-                                "$semester",
-                                semesterObjectId,
-                              ],
-                            },
-                          ]
-                        : []),
-                    ],
-                  },
-                },
-              },
-
-              {
-                $group: {
-                  _id: null,
-
-                  totalPaid: {
-                    $sum: "$amount",
-                  },
-                },
-              },
-            ],
-
-            as: "paymentTotals",
-          },
-        },
-
-        /**
-         * Extract total paid.
-         */
-        {
-          $addFields: {
-            totalPaid: {
-              $ifNull: [
-                {
-                  $arrayElemAt: [
-                    "$paymentTotals.totalPaid",
-                    0,
-                  ],
-                },
-
-                0,
-              ],
-            },
-          },
-        },
-
-        /**
-         * Calculate balance.
-         */
-        {
-          $addFields: {
-            balance: {
-              $subtract: [
-                "$totalFee",
-
-                "$totalPaid",
-              ],
-            },
-          },
-        },
-
-        /**
-         * Only students who owe money.
-         */
-        {
-          $match: {
-            balance: {
-              $gt: 0,
-            },
-          },
-        },
-
-        /**
-         * Produce dashboard totals.
-         */
-        {
-          $group: {
-            _id: null,
-
-            outstandingAmount: {
-              $sum: "$balance",
-            },
-
-            studentsWithOutstanding: {
-              $sum: 1,
-            },
-          },
-        },
-      ]),
     ]);
-
-    /**
-     * Extract dashboard totals.
-     */
-    const totalRevenue =
-      Number(
-        revenueResult[0]?.total,
-      ) || 0;
-
-    const todayRevenue =
-      Number(
-        todayResult[0]?.total,
-      ) || 0;
-
-    const monthlyRevenueTotal =
-      Number(
-        monthlyResult[0]?.total,
-      ) || 0;
-
-    const outstandingAmount =
-      Number(
-        outstandingResult[0]
-          ?.outstandingAmount,
-      ) || 0;
-
-    const studentsWithOutstanding =
-      Number(
-        outstandingResult[0]
-          ?.studentsWithOutstanding,
-      ) || 0;
-
-    /**
-     * Payment method data.
-     */
-    const paymentMethodData =
-      paymentMethods.map(
-        (item) => ({
-          method: String(
-            item._id,
-          ),
-
-          amount:
-            Number(
-              item.amount,
-            ) || 0,
-
-          count:
-            Number(
-              item.count,
-            ) || 0,
-        }),
-      );
-
-    /**
-     * Six-month revenue data.
-     */
-    const revenueByMonth =
-      monthlyRevenue.map(
-        (item) => ({
-          year: item._id.year,
-
-          month: item._id.month,
-
-          amount:
-            Number(
-              item.amount,
-            ) || 0,
-
-          count:
-            Number(
-              item.count,
-            ) || 0,
-
-          date: new Date(
-            item._id.year,
-
-            item._id.month - 1,
-
-            1,
-          ).toLocaleDateString(
-            "en-NG",
-            {
-              month: "short",
-
-              year: "2-digit",
-            },
-          ),
-        }),
-      );
 
     return res.status(200).json({
       success: true,
 
       summary: {
-        ...EMPTY_DASHBOARD_SUMMARY,
+        totalRevenue:
+          Number(
+            totalRevenueResult[0]
+              ?.total,
+          ) || 0,
 
-        totalRevenue,
-
-        todayRevenue,
+        todayRevenue:
+          Number(
+            todayRevenueResult[0]
+              ?.total,
+          ) || 0,
 
         monthlyRevenue:
-          monthlyRevenueTotal,
+          Number(
+            monthlyRevenueResult[0]
+              ?.total,
+          ) || 0,
 
         totalPayments:
-          paymentCount,
+          Number(
+            totalPaymentsResult,
+          ) || 0,
 
-        outstandingAmount,
+        outstandingAmount:
+          Number(
+            outstandingResult.outstandingAmount,
+          ) || 0,
 
-        studentsWithOutstanding,
+        studentsWithOutstanding:
+          Number(
+            outstandingResult.studentsWithOutstanding,
+          ) || 0,
       },
 
       paymentMethods:
-        paymentMethodData,
+        paymentMethodsResult,
 
-      revenueByMonth,
+      monthlyRevenue,
 
       recentPayments,
     });
   } catch (error) {
     console.error(
-      "Finance dashboard error:",
+      "Get finance dashboard error:",
       error,
     );
 
@@ -2154,140 +2852,506 @@ export async function getFinanceDashboard(
   }
 }
 
-/**
- * Finance/Admin views a specific payment by ID.
- */
+/* =========================================================
+   GET OUTSTANDING AMOUNT
+========================================================= */
+
+async function getOutstandingAmount() {
+  const students =
+    await User.find({
+      role: "student",
+    })
+      .select(
+        "_id programme level",
+      )
+      .lean();
+
+  if (!students.length) {
+    return {
+      outstandingAmount: 0,
+
+      studentsWithOutstanding: 0,
+    };
+  }
+
+  const studentIds =
+    students.map(
+      (student) =>
+        student._id,
+    );
+
+  const programmeIds =
+    students
+      .map(
+        (student) =>
+          student.programme,
+      )
+      .filter(
+        (
+          id,
+        ): id is Types.ObjectId =>
+          Boolean(id),
+      );
+
+  if (!programmeIds.length) {
+    return {
+      outstandingAmount: 0,
+
+      studentsWithOutstanding: 0,
+    };
+  }
+
+  const feeStructures =
+    await FeeStructure.find({
+      programme: {
+        $in: programmeIds,
+      },
+
+      isActive: true,
+    })
+      .select(
+        "programme level semester amount",
+      )
+      .lean();
+
+  if (!feeStructures.length) {
+    return {
+      outstandingAmount: 0,
+
+      studentsWithOutstanding: 0,
+    };
+  }
+
+  const payments =
+    await Payment.aggregate([
+      {
+        $match: {
+          student: {
+            $in: studentIds,
+          },
+
+          status: "successful",
+        },
+      },
+
+      {
+        $group: {
+          _id: {
+            student: "$student",
+
+            semester: "$semester",
+          },
+
+          totalPaid: {
+            $sum: "$amount",
+          },
+        },
+      },
+    ]);
+
+  const paymentMap =
+    new Map<string, number>();
+
+  for (
+    const payment of payments
+  ) {
+    const key =
+      `${String(
+        payment._id.student,
+      )}_${String(
+        payment._id.semester,
+      )}`;
+
+    paymentMap.set(
+      key,
+
+      Number(
+        payment.totalPaid,
+      ) || 0,
+    );
+  }
+
+  /*
+   * Group fee structures by:
+   *
+   * programme + normalized level + semester
+   *
+   * This supports multiple categories:
+   *
+   * Tuition
+   * Examination
+   * Acceptance
+   * Library
+   * Registration
+   * etc.
+   */
+  const feeGroupMap =
+    new Map<
+      string,
+      FeeGroup
+    >();
+
+  for (
+    const fee of feeStructures
+  ) {
+    const programmeId =
+      String(fee.programme);
+
+    const semesterId =
+      String(fee.semester);
+
+    const normalizedLevel =
+      normalizeLevel(
+        fee.level,
+      );
+
+    const key =
+      `${programmeId}_${normalizedLevel}_${semesterId}`;
+
+    const existing =
+      feeGroupMap.get(key);
+
+    if (existing) {
+      existing.amount +=
+        Number(fee.amount) || 0;
+    } else {
+      feeGroupMap.set(key, {
+        programme:
+          programmeId,
+
+        level:
+          normalizedLevel,
+
+        semester:
+          semesterId,
+
+        amount:
+          Number(fee.amount) || 0,
+      });
+    }
+  }
+
+  const feeGroups =
+    Array.from(
+      feeGroupMap.values(),
+    );
+
+  let outstandingAmount = 0;
+
+  const countedStudents =
+    new Set<string>();
+
+  for (
+    const student of students
+  ) {
+    if (
+      !student.programme ||
+      !student.level
+    ) {
+      continue;
+    }
+
+    const studentProgramme =
+      String(
+        student.programme,
+      );
+
+    const studentLevel =
+      normalizeLevel(
+        student.level,
+      );
+
+    const studentFeeGroups =
+      feeGroups.filter(
+        (group) =>
+          group.programme ===
+            studentProgramme &&
+          group.level ===
+            studentLevel,
+      );
+
+    for (
+      const group of studentFeeGroups
+    ) {
+      const paymentKey =
+        `${String(
+          student._id,
+        )}_${group.semester}`;
+
+      const totalPaid =
+        paymentMap.get(
+          paymentKey,
+        ) ?? 0;
+
+      const outstanding =
+        Math.max(
+          group.amount -
+            totalPaid,
+          0,
+        );
+
+      if (outstanding > 0) {
+        outstandingAmount +=
+          outstanding;
+
+        countedStudents.add(
+          String(
+            student._id,
+          ),
+        );
+      }
+    }
+  }
+
+  return {
+    outstandingAmount,
+
+    studentsWithOutstanding:
+      countedStudents.size,
+  };
+}
+
+/* =========================================================
+   GET PAYMENT BY ID
+========================================================= */
+
 export async function getPaymentById(
-  req: AuthRequest,
+  req: Request,
   res: Response,
 ) {
   try {
-    const { id } = req.params;
-    const paymentId = Array.isArray(id) ? id[0] : id;
+    const id =
+      typeof req.params.id ===
+      "string"
+        ? req.params.id.trim()
+        : undefined;
 
-    if (!Types.ObjectId.isValid(paymentId)) {
+    if (!id) {
       return res.status(400).json({
         success: false,
-        message: "Invalid payment ID",
+
+        message:
+          "Payment ID is required",
       });
     }
 
-    const payment = await Payment.findById(paymentId)
-      .populate("student", "name email matricNumber programme level")
-      .populate("semester", "name order")
-      .populate("academicSession", "name")
-      .populate("programme", "name code")
-      .populate("department", "name code")
-      .populate("recordedBy", "name email")
-      .populate("verifiedBy", "name email")
-      .lean();
+    if (
+      !Types.ObjectId.isValid(id)
+    ) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "Invalid payment ID",
+      });
+    }
+
+    const payment =
+      await Payment.findById(id)
+        .populate(
+          "student",
+          "name email matricNumber",
+        )
+        .populate(
+          "semester",
+          "name order",
+        )
+        .populate(
+          "academicSession",
+          "name",
+        )
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "department",
+          "name code",
+        )
+        .populate(
+          "recordedBy",
+          "name email role",
+        )
+        .populate(
+          "verifiedBy",
+          "name email role",
+        )
+        .lean();
 
     if (!payment) {
       return res.status(404).json({
         success: false,
-        message: "Payment not found",
+
+        message:
+          "Payment not found",
       });
     }
 
     return res.status(200).json({
       success: true,
+
       payment,
     });
   } catch (error) {
-    console.error("Get payment error:", error);
+    console.error(
+      "Get payment by ID error:",
+      error,
+    );
+
     return res.status(500).json({
       success: false,
-      message: "Unable to retrieve payment",
+
+      message:
+        "Unable to retrieve payment",
     });
   }
 }
 
-/**
- * Finance/Admin verifies a payment.
- */
+/* =========================================================
+   MANUAL VERIFY PAYMENT
+   FINANCE / ADMIN ONLY
+========================================================= */
+
 export async function verifyPayment(
   req: AuthRequest,
   res: Response,
 ) {
   try {
-    const { id } = req.params;
-    const paymentId = Array.isArray(id) ? id[0] : id;
+    const id =
+      typeof req.params.id ===
+      "string"
+        ? req.params.id.trim()
+        : undefined;
 
-    if (!Types.ObjectId.isValid(paymentId)) {
+    if (!id) {
       return res.status(400).json({
         success: false,
-        message: "Invalid payment ID",
+
+        message:
+          "Payment ID is required",
       });
     }
 
-    if (!req.user?.userId) {
-      return res.status(401).json({
+    if (
+      !Types.ObjectId.isValid(id)
+    ) {
+      return res.status(400).json({
         success: false,
-        message: "Authenticated user not found",
+
+        message:
+          "Invalid payment ID",
       });
     }
 
-    const payment = await Payment.findById(paymentId);
+    const payment =
+      await Payment.findById(id);
 
     if (!payment) {
       return res.status(404).json({
         success: false,
-        message: "Payment not found",
+
+        message:
+          "Payment not found",
       });
     }
 
-    if (payment.status === "successful") {
+    if (
+      payment.status ===
+      "successful"
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Payment is already verified",
+
+        message:
+          "Payment is already successful",
       });
     }
 
-    const verifyingUser = await User.findById(req.user.userId);
-    if (!verifyingUser) {
-      return res.status(401).json({
+    /*
+     * Paystack payments must be verified
+     * through Paystack.
+     */
+    if (
+      payment.paymentProvider ===
+      "paystack"
+    ) {
+      return res.status(400).json({
         success: false,
-        message: "Verifying user not found",
+
+        message:
+          "Paystack payments must be verified through Paystack",
       });
     }
 
-    payment.status = "successful";
-    payment.verifiedBy = req.user.userId;
-    payment.verifiedAt = new Date();
-    payment.paidAt = new Date();
+    payment.status =
+      "successful";
+
+    if (req.user?.userId) {
+      payment.verifiedBy =
+        new Types.ObjectId(
+          req.user.userId,
+        );
+    }
+
+    payment.verifiedAt =
+      new Date();
+
+    payment.paidAt =
+      payment.paidAt ??
+      new Date();
 
     await payment.save();
 
-    /**
-     * Log audit.
-     */
-    await AuditLog.create({
-      actor: req.user.userId,
-      actorName: verifyingUser.name,
-      actorEmail: verifyingUser.email,
-      actorRole: verifyingUser.role,
-      action: "APPROVE",
-      module: "PAYMENTS",
-      description: `Verified payment ${payment.paymentReference}`,
-      targetType: "Payment",
-      targetId: String(payment._id),
-      status: "success",
-      metadata: {
-        paymentReference: payment.paymentReference,
-        amount: payment.amount,
-      },
-    });
+    const populatedPayment =
+      await Payment.findById(
+        payment._id,
+      )
+        .populate(
+          "student",
+          "name email matricNumber",
+        )
+        .populate(
+          "semester",
+          "name order",
+        )
+        .populate(
+          "academicSession",
+          "name",
+        )
+        .populate(
+          "programme",
+          "name code",
+        )
+        .populate(
+          "department",
+          "name code",
+        )
+        .populate(
+          "verifiedBy",
+          "name email role",
+        )
+        .lean();
 
     return res.status(200).json({
       success: true,
-      message: "Payment verified successfully",
-      payment,
+
+      message:
+        "Payment verified successfully",
+
+      payment:
+        populatedPayment,
     });
   } catch (error) {
-    console.error("Verify payment error:", error);
+    console.error(
+      "Verify payment error:",
+      error,
+    );
+
     return res.status(500).json({
       success: false,
-      message: "Unable to verify payment",
+
+      message:
+        "Unable to verify payment",
     });
   }
 }

@@ -269,6 +269,29 @@ export async function apiPost<T>(
 }
 
 /* =========================================================
+   POST FORM DATA (for file uploads)
+========================================================= */
+
+export async function apiPostFormData<T>(
+  path: string,
+  formData: FormData,
+  accessToken?: string,
+): Promise<T> {
+  const headers: HeadersInit = {};
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  // Don't set Content-Type for FormData - browser will set it with boundary
+  return apiFetch<T>(path, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+}
+
+/* =========================================================
    PATCH
 ========================================================= */
 

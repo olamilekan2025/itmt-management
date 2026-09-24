@@ -15,7 +15,6 @@ const departmentSchema = new Schema<IDepartment>(
     name: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     code: {

@@ -18,24 +18,7 @@ import {
 const router = Router();
 
 /* =========================================================
-   READ ANNOUNCEMENTS
-
-   Admin:
-   - Full access
-
-   Registrar:
-   - Full read access
-
-   Finance:
-   - Published:
-     everyone
-     staff
-     finance
-
-   Lecturer:
-   - Published:
-     everyone
-     lecturers
+   GET ALL ANNOUNCEMENTS
 ========================================================= */
 
 router.get(
@@ -46,9 +29,14 @@ router.get(
     "registrar",
     "finance",
     "lecturer",
+    "student",
   ),
   getAllAnnouncements,
 );
+
+/* =========================================================
+   GET SINGLE ANNOUNCEMENT
+========================================================= */
 
 router.get(
   "/:id",
@@ -58,12 +46,13 @@ router.get(
     "registrar",
     "finance",
     "lecturer",
+    "student",
   ),
   getAnnouncementById,
 );
 
 /* =========================================================
-   CREATE
+   CREATE ANNOUNCEMENT
    ADMIN ONLY
 ========================================================= */
 
@@ -75,7 +64,7 @@ router.post(
 );
 
 /* =========================================================
-   UPDATE
+   UPDATE ANNOUNCEMENT
    ADMIN ONLY
 ========================================================= */
 
@@ -87,7 +76,7 @@ router.patch(
 );
 
 /* =========================================================
-   PUBLISH
+   PUBLISH ANNOUNCEMENT
    ADMIN ONLY
 ========================================================= */
 
@@ -99,7 +88,7 @@ router.patch(
 );
 
 /* =========================================================
-   ARCHIVE
+   ARCHIVE ANNOUNCEMENT
    ADMIN ONLY
 ========================================================= */
 
@@ -111,7 +100,7 @@ router.patch(
 );
 
 /* =========================================================
-   DELETE
+   DELETE ANNOUNCEMENT
    ADMIN ONLY
 ========================================================= */
 

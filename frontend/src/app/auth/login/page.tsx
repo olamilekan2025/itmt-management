@@ -1133,7 +1133,7 @@ export default function AuthPage() {
                   aria-label="Back to Home"
                 >
                   <img
-                    src="/newLog.png"
+                    src="/newLog.jpg"
                     alt="ITMT Academy"
                     className="h-full w-full object-contain"
                   />
