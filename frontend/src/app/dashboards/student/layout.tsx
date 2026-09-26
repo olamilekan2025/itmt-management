@@ -23,6 +23,8 @@ import {
   useState,
 } from "react";
 
+import { Toaster } from "sonner";
+
 import StudentSidebar from "@/components/dashboard/student/student-sidebar";
 
 /* =========================================================
@@ -295,6 +297,7 @@ export default function StudentLayout({
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-50">
+      <Toaster position="top-right" richColors />
 
       {/* ===================================================
           MOBILE BACKDROP
@@ -357,18 +360,18 @@ export default function StudentLayout({
           className="
             sticky
             top-0
-            z-30
+            z-50
 
             h-[72px]
 
             border-b
             border-slate-200/80
 
-            bg-white/90
+            bg-white/95
 
             shadow-[0_1px_12px_rgba(15,23,42,0.03)]
 
-            backdrop-blur-xl
+            backdrop-blur-md
           "
         >
           <div

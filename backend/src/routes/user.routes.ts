@@ -21,6 +21,7 @@ import {
 
   updateMyProfile,
   changeMyPassword,
+  updateMyPreferences,
 } from "../controllers/user.controller.js";
 
 import {
@@ -74,6 +75,20 @@ router.patch(
   "/me/password",
   authenticate,
   changeMyPassword,
+);
+
+/**
+ * =========================================================
+ * CURRENT USER PREFERENCES
+ * =========================================================
+ *
+ * PATCH /api/users/me/preferences
+ */
+
+router.patch(
+  "/me/preferences",
+  authenticate,
+  updateMyPreferences,
 );
 
 /**

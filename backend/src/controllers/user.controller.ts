@@ -2014,6 +2014,128 @@ const changePasswordSchema =
       },
     );
 
+/**
+ * =========================================================
+ * UPDATE PREFERENCES
+ * =========================================================
+ */
+
+const updatePreferencesSchema =
+  z.object({
+    notificationPreferences: z
+      .object({
+        emailNotifications: z
+          .boolean()
+          .optional(),
+        academicUpdates: z
+          .boolean()
+          .optional(),
+        announcements: z
+          .boolean()
+          .optional(),
+        paymentNotifications: z
+          .boolean()
+          .optional(),
+      })
+      .optional(),
+
+    appearancePreferences: z
+      .object({
+        theme: z
+          .enum([
+            "system",
+            "light",
+            "dark",
+          ])
+          .optional(),
+      })
+      .optional(),
+  });
+
+export async function updateMyPreferences(
+  req: AuthRequest,
+  res: Response,
+) {
+  try {
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        success: false,
+        message:
+          "Authentication required",
+      });
+    }
+
+    const data =
+      updatePreferencesSchema.parse(
+        req.body,
+      );
+
+    const user =
+      await User.findById(
+        req.user.userId,
+      );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Update notification preferences
+    if (
+      data.notificationPreferences
+    ) {
+      user.notificationPreferences = {
+        ...user.notificationPreferences,
+        ...data.notificationPreferences,
+      };
+    }
+
+    // Update appearance preferences
+    if (
+      data.appearancePreferences
+    ) {
+      user.appearancePreferences = {
+        ...user.appearancePreferences,
+        ...data.appearancePreferences,
+      };
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Preferences updated successfully",
+      notificationPreferences:
+        user.notificationPreferences,
+      appearancePreferences:
+        user.appearancePreferences,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors:
+          error.flatten().fieldErrors,
+      });
+    }
+
+    console.error(
+      "Update preferences error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to update preferences",
+    });
+  }
+}
+
 export async function changeMyPassword(
   req: AuthRequest,
   res: Response,

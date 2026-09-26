@@ -30,6 +30,25 @@ export interface IUser extends Document {
   role: UserRole;
 
   /* =====================================================
+     NOTIFICATION PREFERENCES
+  ===================================================== */
+
+  notificationPreferences?: {
+    emailNotifications?: boolean;
+    academicUpdates?: boolean;
+    announcements?: boolean;
+    paymentNotifications?: boolean;
+  };
+
+  /* =====================================================
+     APPEARANCE PREFERENCES
+  ===================================================== */
+
+  appearancePreferences?: {
+    theme?: "system" | "light" | "dark";
+  };
+
+  /* =====================================================
      STAFF INFORMATION
   ===================================================== */
 
@@ -131,6 +150,41 @@ const userSchema = new Schema<IUser>(
       ],
       default: "student",
       required: true,
+    },
+
+    /* =====================================================
+       NOTIFICATION PREFERENCES
+    ===================================================== */
+
+    notificationPreferences: {
+      emailNotifications: {
+        type: Boolean,
+        default: true,
+      },
+      academicUpdates: {
+        type: Boolean,
+        default: true,
+      },
+      announcements: {
+        type: Boolean,
+        default: true,
+      },
+      paymentNotifications: {
+        type: Boolean,
+        default: true,
+      },
+    },
+
+    /* =====================================================
+       APPEARANCE PREFERENCES
+    ===================================================== */
+
+    appearancePreferences: {
+      theme: {
+        type: String,
+        enum: ["system", "light", "dark"],
+        default: "system",
+      },
     },
 
     /* =====================================================
