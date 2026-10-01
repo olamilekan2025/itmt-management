@@ -152,7 +152,7 @@ const navSections: NavSection[] = [
       },
       {
         label: "Academic Sessions",
-        href: "/dashboards/admin/academic-sessions",
+        href: "/dashboards/admin/sessions",
         icon: CalendarDays,
         description: "Manage academic sessions",
       },
@@ -194,13 +194,13 @@ const navSections: NavSection[] = [
       },
       {
         label: "Result Approval",
-        href: "/dashboards/admin/result-approval",
+        href: "/dashboards/admin/results/approval",
         icon: CheckCircle2,
         description: "Approve submitted results",
       },
       {
         label: "Result Reports",
-        href: "/dashboards/admin/result-reports",
+        href: "/dashboards/admin/results/reports",
         icon: FileBarChart,
         description: "Academic result reports",
       },
@@ -254,7 +254,7 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "Academic Reports",
-        href: "/dashboards/admin/reports/academic",
+        href: "/dashboards/admin/academic-reports",
         icon: BarChart3,
         description: "Academic analytics",
       },
@@ -290,7 +290,7 @@ const navSections: NavSection[] = [
       },
       {
         label: "Hero Section",
-        href: "/dashboards/admin/hero",
+        href: "/dashboards/admin/hero-slides",
         icon: Archive,
         description: "Manage website hero",
       },
