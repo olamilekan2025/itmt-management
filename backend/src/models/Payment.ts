@@ -112,7 +112,6 @@ const paymentSchema = new Schema<IPayment>(
     providerTransactionRef: {
       type: String,
       trim: true,
-      sparse: true,
     },
     status: {
       type: String,

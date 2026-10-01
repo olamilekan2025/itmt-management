@@ -107,22 +107,24 @@ function SettingRow({
   children,
 }: SettingRowProps) {
   return (
-    <div className="group flex flex-col gap-4 border-b border-slate-100 py-5 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-start gap-3.5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-brand-navy transition-colors group-hover:border-brand-gold/30 group-hover:bg-brand-gold/10">
-          <Icon className="h-[18px] w-[18px]" />
-        </div>
+    <div className="group border-b border-slate-100 py-5 last:border-b-0">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3.5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-brand-navy transition-colors group-hover:border-brand-gold/30 group-hover:bg-brand-gold/10">
+            <Icon className="h-[18px] w-[18px]" />
+          </div>
 
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-slate-900">{title}</p>
-
-          <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-500">
-            {description}
+          <p className="min-w-0 text-sm font-bold text-slate-900">
+            {title}
           </p>
         </div>
+
+        <div className="shrink-0">{children}</div>
       </div>
 
-      <div className="shrink-0 sm:pl-6">{children}</div>
+      <p className="mt-2.5 max-w-2xl pl-[54px] text-sm leading-5 text-slate-500">
+        {description}
+      </p>
     </div>
   );
 }
@@ -174,7 +176,7 @@ function SectionHeader({
   description: string;
 }) {
   return (
-    <div className="mb-6 flex items-start gap-3.5">
+    <div className="mb-6 flex items-start gap-3.5 sm:gap-4">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-navy text-white shadow-sm">
         <Icon className="h-[18px] w-[18px]" />
       </div>
@@ -294,18 +296,18 @@ function LoadingPreferenceRows() {
       {[1, 2, 3, 4].map((item) => (
         <div
           key={item}
-          className="flex items-center justify-between border-b border-slate-100 py-5 last:border-b-0"
+          className="flex items-center justify-between gap-4 border-b border-slate-100 py-5 last:border-b-0"
         >
-          <div className="flex items-center gap-3.5">
-            <div className="h-10 w-10 animate-pulse rounded-xl bg-slate-100" />
+          <div className="flex min-w-0 items-center gap-3.5">
+            <div className="h-10 w-10 shrink-0 animate-pulse rounded-xl bg-slate-100" />
 
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <div className="h-3.5 w-32 animate-pulse rounded bg-slate-100" />
-              <div className="h-3 w-56 animate-pulse rounded bg-slate-100" />
+              <div className="h-3 w-40 animate-pulse rounded bg-slate-100 sm:w-56" />
             </div>
           </div>
 
-          <div className="h-7 w-12 animate-pulse rounded-full bg-slate-100" />
+          <div className="h-7 w-12 shrink-0 animate-pulse rounded-full bg-slate-100" />
         </div>
       ))}
     </div>
@@ -543,11 +545,11 @@ export default function StudentSettingsPage() {
   };
 
   return (
-    <main className="min-h-full bg-[#f7f8fb]">
+    <main className="min-h-full overflow-x-hidden bg-[#f7f8fb]">
       {/* =========================================================
           TOP HEADER
       ========================================================== */}
-     <header className="border-b border-white/10 bg-brand-navy  rounded-2xl text-white">
+     <header className="border-b border-white/10 bg-brand-navy rounded-b-2xl sm:rounded-2xl text-white">
   <div className="mx-auto max-w-[1540px] px-4 py-5 sm:px-6 lg:px-8">
     <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
@@ -578,7 +580,7 @@ export default function StudentSettingsPage() {
 
       <Link
         href="/dashboards/student"
-        className="group inline-flex w-fit items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-sm font-bold text-white shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-brand-gold/40 hover:bg-white/15 hover:text-brand-gold hover:shadow-lg"
+        className="group inline-flex w-full sm:w-fit items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-sm font-bold text-white shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-brand-gold/40 hover:bg-white/15 hover:text-brand-gold hover:shadow-lg"
       >
         <ChevronRight className="h-4 w-4 rotate-180 transition-transform group-hover:-translate-x-0.5" />
         Back to Dashboard
@@ -595,7 +597,7 @@ export default function StudentSettingsPage() {
           {/* =====================================================
               SETTINGS NAVIGATION
           ====================================================== */}
-          <aside className="h-fit xl:sticky xl:top-6">
+          <aside className="h-fit min-w-0 xl:sticky xl:top-6">
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
               {/* Mini profile */}
               <div className="border-b border-slate-100 p-4">
@@ -625,16 +627,16 @@ export default function StudentSettingsPage() {
               </div>
 
               {/* Navigation */}
-              <div className="p-2">
+              <div className="min-w-0 p-2">
                 <p className="px-3 pb-2 pt-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
                   Manage
                 </p>
 
-                <nav className="flex gap-1 overflow-x-auto xl:block xl:overflow-visible">
+                <nav className="flex snap-x snap-mandatory gap-1 overflow-x-auto pb-2 xl:block xl:overflow-visible xl:pb-0">
                   <button
                     type="button"
                     onClick={() => scrollToSection("account")}
-                    className="group flex shrink-0 items-center gap-3 rounded-xl bg-brand-navy px-3 py-2.5 text-left text-sm font-bold text-white shadow-sm transition-all"
+                    className="group flex shrink-0 snap-start items-center gap-3 rounded-xl bg-brand-navy px-3 py-2.5 text-left text-sm font-bold text-white shadow-sm transition-all"
                   >
                     <UserRound className="h-4 w-4" />
                     <span>Account</span>
@@ -643,7 +645,7 @@ export default function StudentSettingsPage() {
                   <button
                     type="button"
                     onClick={() => scrollToSection("notifications")}
-                    className="group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 hover:text-brand-navy"
+                    className="group flex shrink-0 snap-start items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 hover:text-brand-navy"
                   >
                     <Bell className="h-4 w-4 text-slate-400 group-hover:text-brand-navy" />
                     <span>Notifications</span>
@@ -652,7 +654,7 @@ export default function StudentSettingsPage() {
                   <button
                     type="button"
                     onClick={() => scrollToSection("security")}
-                    className="group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 hover:text-brand-navy"
+                    className="group flex shrink-0 snap-start items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 hover:text-brand-navy"
                   >
                     <ShieldCheck className="h-4 w-4 text-slate-400 group-hover:text-brand-navy" />
                     <span>Security</span>
@@ -661,7 +663,7 @@ export default function StudentSettingsPage() {
                   <button
                     type="button"
                     onClick={() => scrollToSection("appearance")}
-                    className="group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 hover:text-brand-navy"
+                    className="group flex shrink-0 snap-start items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 hover:text-brand-navy"
                   >
                     <Palette className="h-4 w-4 text-slate-400 group-hover:text-brand-navy" />
                     <span>Appearance</span>
@@ -670,7 +672,7 @@ export default function StudentSettingsPage() {
                   <button
                     type="button"
                     onClick={() => scrollToSection("help")}
-                    className="group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 hover:text-brand-navy"
+                    className="group flex shrink-0 snap-start items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 hover:text-brand-navy"
                   >
                     <CircleHelp className="h-4 w-4 text-slate-400 group-hover:text-brand-navy" />
                     <span>Help & Support</span>
@@ -750,11 +752,11 @@ export default function StudentSettingsPage() {
 
                     <div className="min-w-0 pb-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="truncate text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+                        <h2 className="max-w-full truncate text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
                           {studentName}
                         </h2>
 
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                           Active
                         </span>
@@ -779,7 +781,7 @@ export default function StudentSettingsPage() {
 
                   <Link
                     href="/dashboards/student/profile"
-                    className="group inline-flex w-fit items-center gap-2 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#243456] hover:shadow-lg"
+                    className="group inline-flex w-full sm:w-fit items-center justify-center gap-2 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#243456] hover:shadow-lg"
                   >
                     <UserRound className="h-4 w-4" />
                     Edit Profile
@@ -800,7 +802,7 @@ export default function StudentSettingsPage() {
                 description="A quick overview of the information connected to your student account."
               />
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 <InfoCard
                   icon={UserRound}
                   label="Full Name"
@@ -930,7 +932,7 @@ export default function StudentSettingsPage() {
                   type="button"
                   onClick={handleSavePreferences}
                   disabled={saving || loadingPreferences}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#243456] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#243456] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
                 >
                   {saving ? (
                     <>
@@ -982,7 +984,7 @@ export default function StudentSettingsPage() {
                 </div>
 
                 <div className="p-4 sm:p-5">
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                     <PasswordInput
                       label="Current password"
                       value={currentPassword}
@@ -1132,7 +1134,7 @@ export default function StudentSettingsPage() {
                         !confirmPassword ||
                         passwordMismatch
                       }
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-navy px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#243456] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-navy px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#243456] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
                     >
                       {saving ? (
                         <>
@@ -1165,7 +1167,7 @@ export default function StudentSettingsPage() {
                 description="Choose the interface preference you want to use across your student portal."
               />
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <AppearanceCard
                   icon={Laptop}
                   title="System"
@@ -1215,7 +1217,7 @@ export default function StudentSettingsPage() {
                   type="button"
                   onClick={handleSavePreferences}
                   disabled={saving || loadingPreferences}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:border-brand-gold/40 hover:text-brand-navy disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:border-brand-gold/40 hover:text-brand-navy disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
                 >
                   <Save className="h-4 w-4" />
                   {saving ? "Saving..." : "Save Appearance"}

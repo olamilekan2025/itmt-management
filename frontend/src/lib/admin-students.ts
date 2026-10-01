@@ -37,7 +37,7 @@ export async function createExistingStudent(
     message: string;
     student: AdminStudent;
   }>(
-    "/students/existing",
+    "/users/students/existing",
     payload,
     accessToken,
   );

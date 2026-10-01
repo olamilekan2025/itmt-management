@@ -71,8 +71,7 @@ const loginWithOtpSchema = loginSchema.extend({
   otp: z
     .string()
     .trim()
-    .length(6, "OTP must be 6 digits")
-    .optional(),
+    .length(6, "OTP must be 6 digits"),
 });
 
 const verifyEmailSchema = z.object({
@@ -1024,14 +1023,6 @@ export async function login(
       });
     }
 
-    if (!data.otp) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "OTP is required",
-      });
-    }
-
     if (
       !user.otpHash ||
       !user.otpExpires ||
@@ -1044,8 +1035,10 @@ export async function login(
       });
     }
 
+    const providedOtpHash = hashToken(data.otp);
+
     if (
-      hashToken(data.otp) !==
+      providedOtpHash !==
       user.otpHash
     ) {
       return res.status(401).json({

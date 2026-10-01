@@ -6,7 +6,26 @@ import Link from "next/link";
 
 export const dynamic = 'force-dynamic';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+function getApiUrl(): string {
+  const rawApiUrl =
+    process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  if (!rawApiUrl) {
+    throw new Error(
+      "NEXT_PUBLIC_API_URL is not defined. Add it to frontend/.env.local and restart Next.js.",
+    );
+  }
+
+  let apiUrl = rawApiUrl.replace(/\/+$/, "");
+
+  if (!/\/api$/i.test(apiUrl)) {
+    apiUrl = `${apiUrl}/api`;
+  }
+
+  return apiUrl;
+}
+
+const API_URL = getApiUrl();
 
 function VerifyEmailForm() {
   const searchParams = useSearchParams();

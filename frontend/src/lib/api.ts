@@ -30,20 +30,59 @@ export class ApiError extends Error {
    API URL
 ========================================================= */
 
+/**
+ * Returns the API base URL with exactly one `/api`.
+ *
+ * Supported:
+ *
+ * NEXT_PUBLIC_API_URL=https://example.com
+ * -> https://example.com/api
+ *
+ * NEXT_PUBLIC_API_URL=https://example.com/api
+ * -> https://example.com/api
+ *
+ * NEXT_PUBLIC_API_URL=https://example.com/api/
+ * -> https://example.com/api
+ */
 function getApiUrl(): string {
-  if (!API_URL) {
+  const rawApiUrl = API_URL?.trim();
+
+  if (!rawApiUrl) {
     throw new Error(
       "NEXT_PUBLIC_API_URL is not defined. Add it to frontend/.env.local and restart the Next.js server.",
     );
   }
 
-  return API_URL.replace(/\/+$/, "");
+  let apiUrl = rawApiUrl.replace(/\/+$/, "");
+
+  if (!/\/api$/i.test(apiUrl)) {
+    apiUrl = `${apiUrl}/api`;
+  }
+
+  return apiUrl;
 }
 
 /* =========================================================
    NORMALIZE PATH
 ========================================================= */
 
+/**
+ * Normalizes a request path.
+ *
+ * Examples:
+ *
+ * "users"
+ * -> "/users"
+ *
+ * "/users"
+ * -> "/users"
+ *
+ * "/api/users"
+ * -> "/api/users"
+ *
+ * "/api/users?role=student"
+ * -> "/api/users?role=student"
+ */
 function normalizePath(path: string): string {
   const normalized = path.trim();
 
@@ -58,42 +97,41 @@ function normalizePath(path: string): string {
 
 /* =========================================================
    NORMALIZE API PATH
-
-   Backend routes are mounted under /api.
-
-   Examples:
-
-   /users
-   -> /api/users
-
-   /users?role=student
-   -> /api/users?role=student
-
-   /courses
-   -> /api/courses
-
-   /api/users
-   -> /api/users
 ========================================================= */
 
+/**
+ * The API base URL already contains `/api`.
+ *
+ * Therefore:
+ *
+ * /users
+ * -> /users
+ *
+ * /api/users
+ * -> /users
+ *
+ * /api/users?role=student
+ * -> /users?role=student
+ *
+ * This prevents:
+ *
+ * /api/api/users
+ */
 function normalizeApiPath(path: string): string {
-  const normalizedPath = normalizePath(path);
+  const normalized = normalizePath(path);
 
-  // Already contains /api
   if (
-    normalizedPath === "/api" ||
-    normalizedPath.startsWith("/api/")
+    normalized === "/api" ||
+    normalized.toLowerCase() === "/api/"
   ) {
-    return normalizedPath;
+    return "/";
   }
 
-  // Root API route
-  if (normalizedPath === "/") {
-    return "/api/";
+  if (normalized.toLowerCase().startsWith("/api/")) {
+    return normalized.slice(4);
   }
 
-  // Add /api to normal backend routes
-  return `/api${normalizedPath}`;
+  return normalized;
 }
 
 /* =========================================================
@@ -170,6 +208,13 @@ async function apiFetch<T>(
         typeof data.message === "string"
       ) {
         message = data.message;
+      } else if (
+        typeof data === "object" &&
+        data !== null &&
+        "error" in data &&
+        typeof data.error === "string"
+      ) {
+        message = data.error;
       }
 
       throw new ApiError(
@@ -269,7 +314,7 @@ export async function apiPost<T>(
 }
 
 /* =========================================================
-   POST FORM DATA (for file uploads)
+   POST FORM DATA
 ========================================================= */
 
 export async function apiPostFormData<T>(
@@ -283,7 +328,13 @@ export async function apiPostFormData<T>(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  // Don't set Content-Type for FormData - browser will set it with boundary
+  /*
+   * Do NOT manually set Content-Type here.
+   *
+   * The browser automatically adds:
+   *
+   * multipart/form-data; boundary=...
+   */
   return apiFetch<T>(path, {
     method: "POST",
     headers,

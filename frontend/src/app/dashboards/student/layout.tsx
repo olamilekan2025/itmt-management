@@ -2,8 +2,14 @@
 
 import {
   Bell,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  LogOut,
   Menu,
   Search,
+  Settings,
+  ShieldCheck,
   UserRound,
   X,
 } from "lucide-react";
@@ -20,6 +26,7 @@ import {
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -52,6 +59,11 @@ export default function StudentLayout({
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   /* =======================================================
      USER INFORMATION
@@ -63,6 +75,10 @@ export default function StudentLayout({
   const userEmail =
     session?.user?.email?.trim() ||
     "student@itmt.edu.ng";
+
+  const matricNumber =
+    (session?.user as any)?.matricNumber?.trim() ||
+    "Not assigned";
 
   const initials = useMemo(() => {
     const parts = userName
@@ -262,6 +278,59 @@ export default function StudentLayout({
       document.body.style.overflow = "";
     };
   }, [mobileOpen]);
+
+  /*
+   * Close profile menu when clicking outside
+   */
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      const clickedInsideMenu = profileMenuRef.current?.contains(target);
+
+      if (!clickedInsideMenu) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, []);
+
+  /*
+   * Close profile menu when route changes
+   */
+  useEffect(() => {
+    setProfileMenuOpen(false);
+  }, [pathname]);
+
+  /*
+   * Logout handlers
+   */
+  const openLogoutModal = () => {
+    setProfileMenuOpen(false);
+    setLogoutModalOpen(true);
+  };
+
+  const cancelLogout = () => {
+    if (loggingOut) return;
+    setLogoutModalOpen(false);
+  };
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+
+    try {
+      setLoggingOut(true);
+      const { signOut } = await import("next-auth/react");
+      await signOut({ callbackUrl: "/auth/login" });
+    } catch (error) {
+      console.error("Logout error:", error);
+      setLoggingOut(false);
+    }
+  };
 
   /* =======================================================
      AUTH LOADING
@@ -669,131 +738,323 @@ export default function StudentLayout({
                   STUDENT PROFILE
               ================================================== */}
 
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    "/dashboards/student/profile",
-                  )
-                }
-                aria-label="Open student profile"
-                className="
-                  group
-
-                  flex
-                  min-w-0
-                  items-center
-                  gap-2.5
-
-                  rounded-xl
-
-                  px-1.5
-                  py-1
-
-                  transition-all
-                  duration-200
-
-                  hover:bg-slate-50
-
-                  active:scale-[0.98]
-                "
+              <div
+                className="relative"
+                ref={profileMenuRef}
               >
-
-                {/* Avatar */}
-
-                <div
+                <button
+                  type="button"
+                  onClick={() =>
+                    setProfileMenuOpen((current) => !current)
+                  }
+                  aria-label="Open student profile"
+                  aria-expanded={profileMenuOpen}
                   className="
-                    flex
-                    h-9
-                    w-9
-                    shrink-0
+                    group
 
+                    flex
+                    min-w-0
                     items-center
-                    justify-center
+                    gap-2.5
 
                     rounded-xl
 
-                    bg-gradient-to-br
-                    from-brand-gold
-                    to-brand-gold/70
+                    px-1.5
+                    py-1
 
-                    text-[11px]
-                    font-bold
-
-                    text-brand-navy
-
-                    shadow-sm
-
-                    ring-1
-                    ring-brand-gold/20
-                  "
-                >
-                  {initials}
-                </div>
-
-                {/* User details */}
-
-                <div
-                  className="
-                    hidden
-                    min-w-0
-                    text-left
-
-                    md:block
-                  "
-                >
-                  <p
-                    className="
-                      max-w-[150px]
-
-                      truncate
-
-                      text-xs
-                      font-semibold
-
-                      text-slate-800
-                    "
-                    title={userName}
-                  >
-                    {userName}
-                  </p>
-
-                  <p
-                    className="
-                      max-w-[150px]
-
-                      truncate
-
-                      text-[10px]
-
-                      text-slate-400
-                    "
-                    title={userEmail}
-                  >
-                    {userEmail}
-                  </p>
-                </div>
-
-                <UserRound
-                  className="
-                    hidden
-
-                    h-3.5
-                    w-3.5
-                    shrink-0
-
-                    text-slate-300
-
-                    transition-colors
+                    transition-all
                     duration-200
 
-                    group-hover:text-brand-gold
+                    hover:bg-slate-50
 
-                    md:block
+                    active:scale-[0.98]
                   "
-                />
+                >
 
-              </button>
+                  {/* Avatar */}
+
+                  <div
+                    className="
+                      relative
+                      flex
+                      h-9
+                      w-9
+                      shrink-0
+
+                      items-center
+                      justify-center
+
+                      rounded-xl
+
+                      bg-gradient-to-br
+                      from-brand-gold
+                      to-brand-gold/70
+
+                      text-[11px]
+                      font-bold
+
+                      text-brand-navy
+
+                      shadow-sm
+
+                      ring-1
+                      ring-brand-gold/20
+                    "
+                  >
+                    {initials}
+
+                    {/* Online indicator */}
+
+                    <span
+                      className="
+                        absolute
+                        bottom-0
+                        right-0
+                        flex
+                        h-2.5
+                        w-2.5
+                        items-center
+                        justify-center
+                        rounded-full
+                        border-2
+                        border-white
+                        bg-emerald-400
+                      "
+                    />
+                  </div>
+
+                  {/* User details */}
+
+                  <div
+                    className="
+                      hidden
+                      min-w-0
+                      text-left
+
+                      md:block
+                    "
+                  >
+                    <p
+                      className="
+                        max-w-[150px]
+
+                        truncate
+
+                        text-xs
+                        font-semibold
+
+                        text-slate-800
+                      "
+                      title={userName}
+                    >
+                      {userName}
+                    </p>
+
+                    <p
+                      className="
+                        max-w-[150px]
+
+                        truncate
+
+                        text-[10px]
+
+                        text-slate-400
+                      "
+                      title={userEmail}
+                    >
+                      {userEmail}
+                    </p>
+                  </div>
+
+                  <ChevronDown
+                    className="
+                      hidden
+                      h-3.5
+                      w-3.5
+                      shrink-0
+
+                      text-slate-300
+
+                      transition-all
+                      duration-200
+
+                      group-hover:text-brand-gold
+
+                      md:block
+
+                      group-hover:rotate-180
+                    "
+                  />
+
+                </button>
+
+                {/* Profile dropdown menu */}
+
+                {profileMenuOpen && (
+                  <div
+                    className="
+                      absolute
+                      right-0
+                      top-full
+                      z-50
+                      mt-2
+                      w-64
+                      overflow-hidden
+                      rounded-2xl
+                      border
+                      border-slate-200
+                      bg-white
+                      shadow-[0_10px_40px_rgba(15,23,42,0.12)]
+                      animate-in
+                      fade-in
+                      slide-in-from-top-2
+                    "
+                  >
+                    {/* Menu header */}
+
+                    <div
+                      className="
+                        border-b
+                        border-slate-100
+                        bg-slate-50/80
+                        px-4
+                        py-3
+                      "
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="
+                            flex
+                            h-10
+                            w-10
+                            shrink-0
+                            items-center
+                            justify-center
+                            rounded-xl
+                            bg-gradient-to-br
+                            from-brand-gold
+                            to-brand-gold/70
+                            text-[11px]
+                            font-bold
+                            text-brand-navy
+                            shadow-sm
+                          "
+                        >
+                          {initials}
+                        </div>
+
+                        <div className="min-w-0">
+                          <p
+                            className="
+                              truncate
+                              text-sm
+                              font-bold
+                              text-slate-900
+                            "
+                          >
+                            {userName}
+                          </p>
+
+                          <p
+                            className="
+                              truncate
+                              text-xs
+                              text-slate-500
+                            "
+                          >
+                            {matricNumber}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Menu items */}
+
+                    <div className="p-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          router.push("/dashboards/student/profile");
+                          setProfileMenuOpen(false);
+                        }}
+                        className="
+                          flex
+                          w-full
+                          items-center
+                          gap-3
+                          rounded-xl
+                          px-3
+                          py-2.5
+                          text-left
+                          text-sm
+                          font-semibold
+                          text-slate-700
+                          transition-colors
+                          hover:bg-slate-50
+                          hover:text-brand-navy
+                        "
+                      >
+                        <UserRound className="h-4 w-4 text-slate-400" />
+                        View Profile
+                        <ChevronRight className="ml-auto h-3.5 w-3.5 text-slate-300" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          router.push("/dashboards/student/settings");
+                          setProfileMenuOpen(false);
+                        }}
+                        className="
+                          flex
+                          w-full
+                          items-center
+                          gap-3
+                          rounded-xl
+                          px-3
+                          py-2.5
+                          text-left
+                          text-sm
+                          font-semibold
+                          text-slate-700
+                          transition-colors
+                          hover:bg-slate-50
+                          hover:text-brand-navy
+                        "
+                      >
+                        <Settings className="h-4 w-4 text-slate-400" />
+                        Settings
+                        <ChevronRight className="ml-auto h-3.5 w-3.5 text-slate-300" />
+                      </button>
+
+                      <div className="my-1 border-t border-slate-100" />
+
+                      <button
+                        type="button"
+                        onClick={openLogoutModal}
+                        className="
+                          flex
+                          w-full
+                          items-center
+                          gap-3
+                          rounded-xl
+                          px-3
+                          py-2.5
+                          text-left
+                          text-sm
+                          font-semibold
+                          text-red-600
+                          transition-colors
+                          hover:bg-red-50
+                        "
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -831,6 +1092,199 @@ export default function StudentLayout({
         </main>
 
       </div>
+
+      {/* =================================================
+          LOGOUT MODAL
+      ================================================== */}
+
+      {logoutModalOpen && (
+        <div
+          className="
+            fixed
+            inset-0
+            z-[100]
+            flex
+            items-center
+            justify-center
+            bg-black/60
+            p-4
+            backdrop-blur-sm
+          "
+          role="dialog"
+          aria-modal="true"
+          onClick={cancelLogout}
+        >
+          <div
+            className="
+              w-full
+              max-w-md
+              overflow-hidden
+              rounded-3xl
+              border
+              border-slate-200
+              bg-white
+              shadow-[0_30px_100px_rgba(15,23,42,0.25)]
+              animate-in
+              fade-in
+              zoom-in-95
+            "
+            onClick={(event) => event.stopPropagation()}
+          >
+            {/* Modal header */}
+
+            <div className="border-b border-slate-100 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div
+                  className="
+                    flex
+                    h-11
+                    w-11
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-xl
+                    bg-red-50
+                    text-red-600
+                  "
+                >
+                  <LogOut className="h-5 w-5" />
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-gold">
+                    Sign Out
+                  </p>
+
+                  <h2 className="mt-1 text-lg font-bold text-slate-900">
+                    Sign out of your account?
+                  </h2>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal body */}
+
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4">
+                <div
+                  className="
+                    flex
+                    h-10
+                    w-10
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-xl
+                    bg-gradient-to-br
+                    from-brand-gold
+                    to-brand-gold/70
+                    text-[11px]
+                    font-bold
+                    text-brand-navy
+                  "
+                >
+                  {initials}
+                </div>
+
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-900">
+                    {userName}
+                  </p>
+
+                  <p className="truncate text-xs text-slate-500">
+                    {userEmail}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-4 text-sm leading-5 text-slate-600">
+                You will be signed out and redirected to the login page.
+                Any unsaved changes will be lost.
+              </p>
+            </div>
+
+            {/* Modal footer */}
+
+            <div className="flex gap-3 border-t border-slate-100 px-6 py-4">
+              <button
+                type="button"
+                onClick={cancelLogout}
+                disabled={loggingOut}
+                className="
+                  flex
+                  h-11
+                  flex-1
+                  items-center
+                  justify-center
+                  rounded-xl
+                  border
+                  border-slate-200
+                  bg-white
+                  px-4
+                  text-sm
+                  font-semibold
+                  text-slate-700
+                  shadow-sm
+                  transition-all
+                  hover:border-slate-300
+                  hover:bg-slate-50
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                "
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="
+                  flex
+                  h-11
+                  flex-1
+                  items-center
+                  justify-center
+                  gap-2
+                  rounded-xl
+                  bg-brand-navy
+                  px-4
+                  text-sm
+                  font-bold
+                  text-white
+                  shadow-sm
+                  transition-all
+                  hover:bg-brand-dark
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                "
+              >
+                {loggingOut ? (
+                  <>
+                    <div
+                      className="
+                        h-4
+                        w-4
+                        animate-spin
+                        rounded-full
+                        border-2
+                        border-white/30
+                        border-t-white
+                      "
+                    />
+                    Signing out...
+                  </>
+                ) : (
+                  <>
+                    Sign Out
+                    <LogOut className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

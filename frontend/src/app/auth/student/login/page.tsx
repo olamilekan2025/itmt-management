@@ -132,7 +132,7 @@ export default function StudentLoginPage() {
                 >
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl">
                     <img
-                      src="/newLog.png"
+                      src="/newLogo.png"
                       alt="ITMT Academy"
                       className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-95"
                     />
@@ -189,7 +189,7 @@ export default function StudentLoginPage() {
 
                 {/* ADMISSION APPLICATION */}
                 <Link
-                  href="/admissions/apply"
+                  href="/admission-form/apply"
                   className="group flex items-center justify-between rounded-2xl border border-brand-gold/20 bg-brand-gold/5 px-4 py-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-gold/40 hover:bg-brand-gold/10 hover:shadow-lg"
                 >
                   <div className="flex items-center gap-3">
@@ -240,7 +240,7 @@ export default function StudentLoginPage() {
                   aria-label="Back to Home"
                 >
                    <img
-                      src="/login.png"
+                      src="/newLogo.png"
                       alt="ITMT Academy"
                       className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-95"
                     />

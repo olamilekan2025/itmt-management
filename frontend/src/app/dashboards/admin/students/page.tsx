@@ -678,7 +678,7 @@ export default function AdminStudentsPage() {
                 </button>
               ) : (
                 <Link
-                  href="/dashboards/admin/students/existing"
+                  href="/dashboards/admin/existing"
                   className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand-navy px-4 text-sm font-semibold text-white shadow-sm transition-all hover:bg-brand-navy/95 hover:shadow-md"
                 >
                   <Plus className="h-4 w-4" />

@@ -1641,8 +1641,6 @@ export async function approveAdmission(
           name,
           applicationNumber,
           matricNumber,
-          admissionLetterData?.buffer,
-          admissionLetterData?.reference,
         );
       } catch (emailError) {
         console.error(

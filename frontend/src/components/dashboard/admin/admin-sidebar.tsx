@@ -46,6 +46,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { Mail } from "lucide-react";
 
 /* =========================================================
    TYPES
@@ -109,7 +110,7 @@ const navSections: NavSection[] = [
       },
       {
         label: "Add Existing Student",
-        href: "/dashboards/admin/students/add-existing",
+        href: "/dashboards/admin/existing",
         icon: UserPlus,
         description: "Add existing students",
       },
@@ -225,22 +226,28 @@ const navSections: NavSection[] = [
   },
 
   {
-    title: "Communication",
-    items: [
-      {
-        label: "Notifications",
-        href: "/dashboards/admin/notifications",
-        icon: Bell,
-        description: "System notifications",
-      },
-      {
-        label: "Announcements",
-        href: "/dashboards/admin/announcements",
-        icon: MessageSquareText,
-        description: "Manage announcements",
-      },
-    ],
-  },
+  title: "Communication",
+  items: [
+    {
+      label: "Notifications",
+      href: "/dashboards/admin/notifications",
+      icon: Bell,
+      description: "System notifications",
+    },
+    {
+      label: "Announcements",
+      href: "/dashboards/admin/announcements",
+      icon: MessageSquareText,
+      description: "Manage announcements",
+    },
+    {
+      label: "Contact Messages",
+      href: "/dashboards/admin/contact-messages",
+      icon: Mail,
+      description: "Manage website enquiries",
+    },
+  ],
+},
 
   {
     title: "Reports",

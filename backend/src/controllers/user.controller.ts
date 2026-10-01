@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 
 import User from "../models/User.js";
 import Programme from "../models/Programme.js";
@@ -39,7 +40,7 @@ function getRouteId(
 }
 
 function isValidObjectId(id: string): boolean {
-  return /^[a-f\d]{24}$/i.test(id);
+  return mongoose.Types.ObjectId.isValid(id);
 }
 
 function isDuplicateKeyError(
@@ -62,12 +63,17 @@ function isDuplicateKeyError(
  * COMMON USER SELECT
  * =========================================================
  *
- * Keep this centralized so all user responses have a
- * consistent shape.
+ * Never include:
+ * - password
+ * - OTP hashes
+ * - password reset tokens
+ * - email verification tokens
+ *
+ * These fields are intentionally excluded.
  */
 
 const userSelect =
-  "name email role programme academicSession level matricNumber isActive isSuspended isEmailVerified createdAt updatedAt";
+  "_id name email phone profileImage role staffNumber qualification programme academicSession level matricNumber isActive isSuspended isEmailVerified createdAt updatedAt";
 
 /**
  * =========================================================
@@ -158,9 +164,10 @@ export async function assignProgramme(
     }
 
     if (data.matricNumber !== undefined) {
-      user.matricNumber = data.matricNumber
-        .trim()
-        .toUpperCase();
+      user.matricNumber =
+        data.matricNumber
+          .trim()
+          .toUpperCase();
     }
 
     await user.save();
@@ -179,7 +186,8 @@ export async function assignProgramme(
         studentId: user._id.toString(),
         studentName: user.name,
         studentEmail: user.email,
-        programmeId: programme._id.toString(),
+        programmeId:
+          programme._id.toString(),
         programmeName: programme.name,
         programmeCode: programme.code,
         level:
@@ -188,7 +196,9 @@ export async function assignProgramme(
             : user.level,
         matricNumber:
           data.matricNumber !== undefined
-            ? data.matricNumber.trim().toUpperCase()
+            ? data.matricNumber
+                .trim()
+                .toUpperCase()
             : user.matricNumber,
       },
       status: "success",
@@ -431,9 +441,11 @@ export async function createExistingStudent(
       description:
         `Existing student ${user.name} (${user.matricNumber}) was added to the system.`,
       targetType: "User",
-      resourceId: user._id.toString(),
+      resourceId:
+        user._id.toString(),
       metadata: {
-        studentId: user._id.toString(),
+        studentId:
+          user._id.toString(),
         name: user.name,
         email: user.email,
         matricNumber:
@@ -475,7 +487,15 @@ export async function createExistingStudent(
         id: user._id,
         name: user.name,
         email: user.email,
+        phone:
+          user.phone ?? null,
+        profileImage:
+          user.profileImage ?? null,
         role: user.role,
+        staffNumber:
+          user.staffNumber ?? null,
+        qualification:
+          user.qualification ?? null,
         matricNumber:
           user.matricNumber,
         programme:
@@ -738,9 +758,7 @@ export async function activateUser(
   try {
     const id = getRouteId(req, res);
 
-    if (!id) {
-      return;
-    }
+    if (!id) return;
 
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -852,9 +870,7 @@ export async function deactivateUser(
   try {
     const id = getRouteId(req, res);
 
-    if (!id) {
-      return;
-    }
+    if (!id) return;
 
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -1068,8 +1084,17 @@ export async function createStaffUser(
         id: user._id,
         name: user.name,
         email: user.email,
+        phone:
+          user.phone ?? null,
+        profileImage:
+          user.profileImage ?? null,
         role: user.role,
-        isActive: user.isActive,
+        staffNumber:
+          user.staffNumber ?? null,
+        qualification:
+          user.qualification ?? null,
+        isActive:
+          user.isActive,
         isSuspended:
           user.isSuspended,
         isEmailVerified:
@@ -1125,9 +1150,7 @@ export async function activateStaffUser(
   try {
     const id = getRouteId(req, res);
 
-    if (!id) {
-      return;
-    }
+    if (!id) return;
 
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -1238,9 +1261,7 @@ export async function deactivateStaffUser(
   try {
     const id = getRouteId(req, res);
 
-    if (!id) {
-      return;
-    }
+    if (!id) return;
 
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -1355,9 +1376,7 @@ export async function suspendStaffUser(
   try {
     const id = getRouteId(req, res);
 
-    if (!id) {
-      return;
-    }
+    if (!id) return;
 
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -1477,9 +1496,7 @@ export async function unsuspendStaffUser(
   try {
     const id = getRouteId(req, res);
 
-    if (!id) {
-      return;
-    }
+    if (!id) return;
 
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -1580,16 +1597,131 @@ export async function unsuspendStaffUser(
 
 /**
  * =========================================================
- * GET CURRENT USER
+ * DELETE USER
  * =========================================================
  *
- * GET /api/users/me
+ * DELETE /api/users/:id
  *
- * This is used by the lecturer profile page.
+ * Admin only.
  *
- * IMPORTANT:
- * createdAt and updatedAt are intentionally returned
- * because the frontend displays "Member Since".
+ * The authenticated administrator cannot delete
+ * their own account.
+ */
+
+export async function deleteUser(
+  req: AuthRequest,
+  res: Response,
+) {
+  try {
+    const id = getRouteId(req, res);
+
+    if (!id) {
+      return;
+    }
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid user ID",
+      });
+    }
+
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        success: false,
+        message:
+          "Authentication required",
+      });
+    }
+
+    if (req.user.userId === id) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "You cannot delete your own administrator account",
+      });
+    }
+
+    const user =
+      await User.findById(id).select(
+        "_id name email phone profileImage role staffNumber qualification",
+      );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "User not found",
+      });
+    }
+
+    const deletedUserId =
+      user._id.toString();
+
+    const deletedUserName =
+      user.name;
+
+    const deletedUserEmail =
+      user.email;
+
+    const deletedUserRole =
+      user.role;
+
+    await User.findByIdAndDelete(id);
+
+    await createAuditLog({
+      req,
+      actorId: req.user.userId,
+      actorRole: req.user.role,
+      action: "DELETE",
+      module: "USERS",
+      description:
+        `User account for ${deletedUserName} (${deletedUserEmail}) was permanently deleted.`,
+      targetType: "User",
+      resourceId: deletedUserId,
+      metadata: {
+        deletedUserId,
+        deletedUserName,
+        deletedUserEmail,
+        deletedUserRole,
+        phone:
+          user.phone ?? null,
+        staffNumber:
+          user.staffNumber ?? null,
+      },
+      status: "success",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message:
+        `${deletedUserName} has been deleted successfully`,
+      user: {
+        id: deletedUserId,
+        name: deletedUserName,
+        email: deletedUserEmail,
+        role: deletedUserRole,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Delete user error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to delete user",
+    });
+  }
+}
+
+/**
+ * =========================================================
+ * GET CURRENT USER
+ * =========================================================
  */
 
 export async function getMe(
@@ -1637,7 +1769,19 @@ export async function getMe(
 
         email: user.email,
 
+        phone:
+          user.phone ?? null,
+
+        profileImage:
+          user.profileImage ?? null,
+
         role: user.role,
+
+        staffNumber:
+          user.staffNumber ?? null,
+
+        qualification:
+          user.qualification ?? null,
 
         programme:
           user.programme ?? null,
@@ -1733,12 +1877,6 @@ export async function getStaffUsers(
  * =========================================================
  * UPDATE CURRENT USER PROFILE
  * =========================================================
- *
- * Currently lecturers/staff can edit only:
- * - name
- * - email
- *
- * Institution-controlled fields remain protected.
  */
 
 const updateProfileSchema =
@@ -2082,7 +2220,6 @@ export async function updateMyPreferences(
       });
     }
 
-    // Update notification preferences
     if (
       data.notificationPreferences
     ) {
@@ -2092,7 +2229,6 @@ export async function updateMyPreferences(
       };
     }
 
-    // Update appearance preferences
     if (
       data.appearancePreferences
     ) {

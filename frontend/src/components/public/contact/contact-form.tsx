@@ -11,7 +11,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { apiPost } from "@/lib/api";
 
 const initialFormData = {
   name: "",
@@ -45,24 +45,15 @@ export default function ContactForm() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${API_URL}/contact`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Failed to send message.");
-        return;
-      }
+      await apiPost("/contact", formData);
 
       setSuccess(true);
-    } catch {
-      setError("Unable to send your message. Please try again.");
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Unable to send your message. Please try again."
+      );
     } finally {
       setIsSubmitting(false);
     }

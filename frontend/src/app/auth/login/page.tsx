@@ -25,8 +25,26 @@ import {
    API CONFIGURATION
 ========================================================= */
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
+function getApiUrl(): string {
+  const rawApiUrl =
+    process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  if (!rawApiUrl) {
+    throw new Error(
+      "NEXT_PUBLIC_API_URL is not defined. Add it to frontend/.env.local and restart Next.js.",
+    );
+  }
+
+  let apiUrl = rawApiUrl.replace(/\/+$/, "");
+
+  if (!/\/api$/i.test(apiUrl)) {
+    apiUrl = `${apiUrl}/api`;
+  }
+
+  return apiUrl;
+}
+
+const API_URL = getApiUrl();
 
 /* =========================================================
    TYPES
@@ -165,7 +183,7 @@ export default function AuthPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/auth/login-request`,
+        `${API_URL}/auth/login-request`,
         {
           method: "POST",
           headers: {
@@ -282,7 +300,7 @@ export default function AuthPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/auth/login-request`,
+        `${API_URL}/auth/login-request`,
         {
           method: "POST",
           headers: {
@@ -367,6 +385,7 @@ export default function AuthPage() {
       );
 
       if (result?.error) {
+        console.log("NextAuth error:", result.error);
         toast.error(
           signInOtp
             ? "Invalid or expired verification code."
@@ -1026,7 +1045,7 @@ export default function AuthPage() {
                 >
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl">
                     <img
-                      src="/login.png"
+                      src="/newLogo.png"
                       alt="ITMT Academy"
                       className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-95"
                     />
@@ -1133,7 +1152,7 @@ export default function AuthPage() {
                   aria-label="Back to Home"
                 >
                   <img
-                    src="/newLog.jpg"
+                    src="/newLogo.png"
                     alt="ITMT Academy"
                     className="h-full w-full object-contain"
                   />
@@ -1172,7 +1191,7 @@ export default function AuthPage() {
                   </Link>
 
                   <Link
-                    href="/admissions/apply"
+                    href="/admissions-form/apply"
                     className="flex items-center justify-center gap-2 text-sm text-slate-500 transition-colors hover:text-brand-navy"
                   >
                     <UserPlus className="h-4 w-4" />

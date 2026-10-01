@@ -22,6 +22,8 @@ import {
   updateMyProfile,
   changeMyPassword,
   updateMyPreferences,
+
+  deleteUser,
 } from "../controllers/user.controller.js";
 
 import {
@@ -99,6 +101,9 @@ router.patch(
  * Admin only.
  */
 
+/**
+ * GET /api/users/staff
+ */
 router.get(
   "/staff",
   authenticate,
@@ -106,6 +111,9 @@ router.get(
   getStaffUsers,
 );
 
+/**
+ * GET /api/users/staff/:id
+ */
 router.get(
   "/staff/:id",
   authenticate,
@@ -113,6 +121,9 @@ router.get(
   getStaffUserById,
 );
 
+/**
+ * POST /api/users/staff
+ */
 router.post(
   "/staff",
   authenticate,
@@ -126,6 +137,9 @@ router.post(
  * =========================================================
  */
 
+/**
+ * PATCH /api/users/staff/:id/activate
+ */
 router.patch(
   "/staff/:id/activate",
   authenticate,
@@ -133,6 +147,9 @@ router.patch(
   activateStaffUser,
 );
 
+/**
+ * PATCH /api/users/staff/:id/deactivate
+ */
 router.patch(
   "/staff/:id/deactivate",
   authenticate,
@@ -140,6 +157,9 @@ router.patch(
   deactivateStaffUser,
 );
 
+/**
+ * PATCH /api/users/staff/:id/suspend
+ */
 router.patch(
   "/staff/:id/suspend",
   authenticate,
@@ -147,6 +167,9 @@ router.patch(
   suspendStaffUser,
 );
 
+/**
+ * PATCH /api/users/staff/:id/unsuspend
+ */
 router.patch(
   "/staff/:id/unsuspend",
   authenticate,
@@ -158,6 +181,8 @@ router.patch(
  * =========================================================
  * EXISTING STUDENTS
  * =========================================================
+ *
+ * POST /api/users/students/existing
  */
 
 router.post(
@@ -171,6 +196,13 @@ router.post(
  * =========================================================
  * ALL USERS
  * =========================================================
+ *
+ * GET /api/users
+ *
+ * Accessible by:
+ * - admin
+ * - registrar
+ * - finance
  */
 
 router.get(
@@ -188,6 +220,10 @@ router.get(
  * =========================================================
  * USER PROGRAMME
  * =========================================================
+ *
+ * PATCH /api/users/:id/programme
+ *
+ * Admin and registrar only.
  */
 
 router.patch(
@@ -204,8 +240,13 @@ router.patch(
  * =========================================================
  * STUDENT ACCOUNT STATUS
  * =========================================================
+ *
+ * Admin only.
  */
 
+/**
+ * PATCH /api/users/:id/activate
+ */
 router.patch(
   "/:id/activate",
   authenticate,
@@ -213,6 +254,9 @@ router.patch(
   activateUser,
 );
 
+/**
+ * PATCH /api/users/:id/deactivate
+ */
 router.patch(
   "/:id/deactivate",
   authenticate,
@@ -222,12 +266,43 @@ router.patch(
 
 /**
  * =========================================================
+ * DELETE USER
+ * =========================================================
+ *
+ * DELETE /api/users/:id
+ *
+ * Admin only.
+ *
+ * The controller is responsible for:
+ * - validating the user ID
+ * - checking that the user exists
+ * - preventing an administrator from deleting their own account
+ * - permanently deleting the account
+ * - creating an audit log
+ */
+
+router.delete(
+  "/:id",
+  authenticate,
+  authorize("admin"),
+  deleteUser,
+);
+
+/**
+ * =========================================================
  * USER BY ID
  * =========================================================
  *
+ * GET /api/users/:id
+ *
  * IMPORTANT:
- * This route stays LAST so /me and /staff/:id are not
- * accidentally interpreted as a generic :id route.
+ * Keep this route LAST so:
+ *
+ * /me
+ * /staff
+ * /staff/:id
+ *
+ * are not accidentally interpreted as a generic :id route.
  */
 
 router.get(
