@@ -175,7 +175,7 @@ export default function FinanceSettingsPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/users/me`,
+        `${API_URL}/api/users/me`,
         {
           method: "GET",
           headers: {
@@ -298,7 +298,7 @@ export default function FinanceSettingsPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/users/me`,
+        `${API_URL}/api/users/me`,
         {
           method: "PATCH",
           headers: {
@@ -444,7 +444,7 @@ export default function FinanceSettingsPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/users/me/password`,
+        `${API_URL}/api/users/me/password`,
         {
           method: "PATCH",
           headers: {

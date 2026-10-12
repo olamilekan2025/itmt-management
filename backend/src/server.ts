@@ -28,6 +28,7 @@ import transcriptRequestRoutes from "./routes/transcript-request.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import announcementRoutes from "./routes/announcement.routes.js";
 import academicReportRoutes from "./routes/academic-report.routes.js";
+import reportRoutes from "./routes/report.routes.js";
 import auditLogRoutes from "./routes/auditLog.routes.js";
 import heroSlideRoutes from "./routes/heroSlide.routes.js";
 import feeCategoryRoutes from "./routes/feeCategory.routes.js";
@@ -148,6 +149,8 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/announcements", announcementRoutes);
 
 app.use("/api/academic-reports", academicReportRoutes);
+
+app.use("/api/reports", reportRoutes);
 
 app.use("/api/audit-logs", auditLogRoutes);
 

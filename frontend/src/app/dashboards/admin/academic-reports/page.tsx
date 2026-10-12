@@ -37,6 +37,12 @@ import {
 
 import { apiGet } from "@/lib/api";
 
+import {
+  getSemesters,
+  type SemestersResponse,
+  type Semester,
+} from "@/lib/admin-courses";
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -44,13 +50,6 @@ import { apiGet } from "@/lib/api";
 type AcademicSession = {
   _id: string;
   name: string;
-};
-
-type Semester = {
-  _id: string;
-  name: string;
-  order?: number;
-  session?: string;
 };
 
 type Programme = {
@@ -133,12 +132,6 @@ type AcademicReportResponse = {
 type SessionsResponse = {
   success: boolean;
   sessions?: AcademicSession[];
-  message?: string;
-};
-
-type SemestersResponse = {
-  success: boolean;
-  semesters?: Semester[];
   message?: string;
 };
 
@@ -271,6 +264,9 @@ export default function AdminAcademicReportsPage() {
   const [loadingFilters, setLoadingFilters] =
     useState(false);
 
+  const [loadingSemesters, setLoadingSemesters] =
+    useState(false);
+
   const [generating, setGenerating] =
     useState(false);
 
@@ -366,21 +362,19 @@ export default function AdminAcademicReportsPage() {
       }
 
       try {
-        const query = `?session=${encodeURIComponent(
-          sessionId,
-        )}`;
+        setLoadingSemesters(true);
 
-        const response =
-          await apiGet<SemestersResponse>(
-            `/semesters${query}`,
-            accessToken,
-          );
+        console.log("Loading semesters for session:", sessionId);
+
+        const response = await getSemesters(
+          accessToken,
+          sessionId,
+        );
+
+        console.log("Semesters response:", response);
 
         if (!response?.success) {
-          throw new Error(
-            response?.message ||
-              "Unable to load semesters.",
-          );
+          throw new Error("Unable to load semesters.");
         }
 
         setSemesters(
@@ -401,6 +395,8 @@ export default function AdminAcademicReportsPage() {
             ? error.message
             : "Unable to load semesters.",
         );
+      } finally {
+        setLoadingSemesters(false);
       }
     },
     [accessToken],
@@ -905,8 +901,7 @@ export default function AdminAcademicReportsPage() {
                 }
                 disabled={
                   loadingFilters ||
-                  (!!selectedSession &&
-                    semesters.length === 0)
+                  loadingSemesters
                 }
                 className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-brand-navy focus:ring-4 focus:ring-brand-navy/10 disabled:cursor-not-allowed disabled:bg-slate-50"
               >

@@ -189,19 +189,12 @@ interface DepartmentsResponse {
  *
  * {
  *   success: true,
- *   academicSessions: [...]
- * }
- *
- * NOT:
- *
- * {
- *   success: true,
  *   sessions: [...]
  * }
  */
 interface SessionsResponse {
   success: boolean;
-  academicSessions?: AcademicSession[];
+  sessions?: AcademicSession[];
 }
 
 /* =========================================================
@@ -387,24 +380,11 @@ export default function ApplyForAdmissionPage() {
       ----------------------------------------------------- */
 
       if (sessResult.status === "fulfilled") {
-        /*
-         * FIX:
-         *
-         * The backend response property is
-         * "academicSessions".
-         *
-         * The old code incorrectly used:
-         *
-         * sessResult.value.sessions
-         *
-         * which always produced undefined.
-         */
-
         const loadedSessions =
           Array.isArray(
-            sessResult.value.academicSessions,
+            sessResult.value.sessions,
           )
-            ? sessResult.value.academicSessions
+            ? sessResult.value.sessions
             : [];
 
         /*
