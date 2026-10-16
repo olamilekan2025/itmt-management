@@ -315,11 +315,8 @@
 }
 
 /* Base Styles */
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
 
+@layer base {
   html {
     @apply font-sans;
     scroll-behavior: smooth;
@@ -335,23 +332,9 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-
-  button,
-  input,
-  textarea,
-  select {
-    font: inherit;
-  }
-
-  button {
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  ::selection {
-    color: #ffffff;
-    background: #1B2847;
-  }
 }
+
+
 
 /* Typography Utilities */
 @layer utilities {
@@ -361,8 +344,8 @@
   }
 
   .font-display {
-    font-family: var(--font-protest), sans-serif;
-    font-weight: 400;
+    font-family: var(--font-montserrat), sans-serif;
+    font-weight: 700;
   }
 
   .text-brand-gradient {
@@ -373,10 +356,11 @@
     );
     -webkit-background-clip: text;
     background-clip: text;
+    -webkit-text-fill-color: transparent;
     color: transparent;
   }
 
-  /* Existing Float Utility */
+  /* Floating Animation */
   .animate-float {
     animation: float 3s ease-in-out infinite;
   }
@@ -393,14 +377,9 @@
   }
 }
 
-/* Respect users who prefer reduced motion */
+/* Respect reduced-motion preferences */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .animate-float {
+    animation: none;
   }
 }

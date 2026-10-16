@@ -74,7 +74,7 @@ export default function AboutPlatform() {
   return (
     <section
       aria-labelledby="about-platform-heading"
-     className="relative isolate overflow-hidden bg-[#FFFFFF] py-20 sm:py-24 lg:py-32"
+     className="relative isolate overflow-hidden bg-[#FFFFFF] py-20 sm:py-24 lg:py-40"
     >
       {/* Subtle background detail */}
       <div
@@ -82,7 +82,7 @@ export default function AboutPlatform() {
         className="pointer-events-none absolute -left-40 top-24 -z-10 h-80 w-80 rounded-full bg-[#C8A951]/[0.07] blur-3xl"
       />
 
-      <div className="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-14 xl:px-20">
+      <div className="mx-auto max-w-[1380px] px-5 sm:px-8 lg:px-20 xl:px-20">
         <div className="grid items-center gap-12 lg:grid-cols-[0.88fr_1.12fr] lg:gap-16 xl:gap-24">
           {/* LEFT: Editorial introduction */}
           <motion.div {...reveal} className="relative z-10">

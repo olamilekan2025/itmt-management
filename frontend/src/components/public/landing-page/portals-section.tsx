@@ -75,7 +75,7 @@ export default function PortalsSection() {
         className="pointer-events-none absolute -right-40 bottom-0 h-96 w-96 rounded-full bg-brand-gold/[0.08] blur-3xl"
       /> */}
 
-      <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+      <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-8">
         {/* Header */}
         <motion.div
           initial={reduce ? false : { opacity: 0, y: 12 }}

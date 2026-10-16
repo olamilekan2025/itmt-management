@@ -66,7 +66,7 @@ function AdvantageItem({
 }: AdvantageCard) {
   return (
     <article
-      className={`group relative flex h-full min-h-[350px] flex-col overflow-hidden rounded-2xl border p-6 transition-all duration-200 sm:p-7 lg:p-8 ${
+      className={`group relative flex h-full min-h-[350px] flex-col overflow-hidden rounded-2xl border p-6 transition-all duration-200 sm:p-7 lg:p-8  ${
         featured
           ? "border-brand-gold bg-white shadow-[0_12px_35px_rgba(15,23,42,0.09)]"
           : "border-slate-200 bg-white hover:border-brand-gold/60 hover:shadow-[0_12px_30px_rgba(15,23,42,0.06)]"
@@ -136,9 +136,9 @@ export default function TrustStats() {
   return (
     <section
       aria-labelledby="trust-stats-heading"
-      className="relative overflow-hidden bg-[#FAFAFA] py-16 sm:py-20 lg:py-24"
+      className="relative overflow-hidden bg-[#FAFAFA] py-16 sm:py-20 lg:py-20"
     >
-      <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-9">
         <div className="mx-auto mb-11 max-w-3xl text-center sm:mb-14">
           <div className="mb-5 inline-flex items-center gap-2.5">
             <span className="h-px w-7 bg-brand-gold" />

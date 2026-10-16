@@ -72,7 +72,7 @@ export default function FeaturesSection() {
         className="pointer-events-none absolute -right-40 -top-40 h-96 w-96 rounded-full bg-brand-gold/[0.08] blur-3xl"
       />
 
-      <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+      <div className="relative mx-auto max-w-8xl px-5 sm:px-8 lg:px-10">
         {/* Header */}
         <motion.div
           initial={reduce ? false : { opacity: 0, y: 12 }}
@@ -94,7 +94,7 @@ export default function FeaturesSection() {
         </motion.div>
 
         {/* Cards */}
-        <div className="mx-auto mt-12 grid max-w-6xl grid-cols-1 gap-6 sm:mt-14 md:grid-cols-2 lg:grid-cols-3 lg:gap-7">
+        <div className="mx-auto mt-12 grid max-w-7xl grid-cols-1 gap-6 sm:mt-14 md:grid-cols-2 lg:grid-cols-3 lg:gap-7 lg:px-8">
           {features.map((feature, index) => {
             const Icon = feature.icon;
 

@@ -337,7 +337,7 @@ export default function AboutTeam() {
           ) : members.length === 0 ? (
             <TeamEmptyState active={active} />
           ) : (
-            <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+            <div className="grid grid-cols-1 items-start with-full gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
               {members.map((member) => (
                 <Link
                   key={member._id}
