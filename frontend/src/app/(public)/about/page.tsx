@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 
 import AboutHero from "@/components/public/about/about-hero";
-import AboutIntroduction from "@/components/public/about/about-introduction";
+import AboutIntroduction from "@/components/public/about/about-team";
 import AboutMission from "@/components/public/about/about-mission";
 import AboutEcosystem from "@/components/public/about/about-ecosystem";
 import AboutValues from "@/components/public/about/about-values";
@@ -12,6 +12,7 @@ import AboutPlatform from "@/components/public/about/about-platform";
 import AboutFlow from "@/components/public/about/about-flow";
 import AboutSecurity from "@/components/public/about/about-security";
 import AboutCta from "@/components/public/about/about-cta";
+import AboutTeam from "@/components/public/about/about-team";
 
 export const metadata: Metadata = {
   title: "About ITMT",
@@ -25,14 +26,14 @@ export default function AboutPage() {
 
       <main>
         <AboutHero />
-        <AboutIntroduction />
+        <AboutTeam />
         <AboutMission />
         <AboutEcosystem />
         <AboutValues />
         <AboutRoles />
         <AboutPlatform />
         <AboutFlow />
-        <AboutSecurity />
+        {/* <AboutSecurity /> */}
         <AboutCta />
       </main>
 

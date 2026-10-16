@@ -1,4 +1,6 @@
+
 import multer from "multer";
+import { extname } from "node:path";
 
 /* =========================================================
    GENERAL IMAGE FILTER
@@ -6,9 +8,7 @@ import multer from "multer";
 
 function fileFilter(
   _req: any,
-
   file: Express.Multer.File,
-
   cb: multer.FileFilterCallback,
 ) {
   const allowedTypes = [
@@ -17,21 +17,12 @@ function fileFilter(
     "image/webp",
   ];
 
-  if (
-    allowedTypes.includes(
-      file.mimetype,
-    )
-  ) {
+  if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
-
     return;
   }
 
-  cb(
-    new Error(
-      "Only JPEG, PNG, or WEBP images are allowed",
-    ),
-  );
+  cb(new Error("Only JPEG, PNG, or WEBP images are allowed"));
 }
 
 /* =========================================================
@@ -40,39 +31,18 @@ function fileFilter(
 
 function admissionDocumentFileFilter(
   _req: any,
-
   file: Express.Multer.File,
-
   cb: multer.FileFilterCallback,
 ) {
-  /* -------------------------------------------------------
-     PASSPORT PHOTOGRAPH
-     
-     Passport photograph:
-     JPEG
-     PNG
-     WEBP
-
-     PDF is NOT allowed.
-  ------------------------------------------------------- */
-
-  if (
-    file.fieldname ===
-    "passportPhoto"
-  ) {
+  if (file.fieldname === "passportPhoto") {
     const allowedPassportTypes = [
       "image/jpeg",
       "image/png",
       "image/webp",
     ];
 
-    if (
-      allowedPassportTypes.includes(
-        file.mimetype,
-      )
-    ) {
+    if (allowedPassportTypes.includes(file.mimetype)) {
       cb(null, true);
-
       return;
     }
 
@@ -81,19 +51,8 @@ function admissionDocumentFileFilter(
         "Passport photograph must be a JPEG, PNG, or WEBP image",
       ),
     );
-
     return;
   }
-
-  /* -------------------------------------------------------
-     SUPPORTING DOCUMENTS
-     
-     Supporting documents:
-     JPEG
-     PNG
-     WEBP
-     PDF
-  ------------------------------------------------------- */
 
   const allowedDocumentTypes = [
     "image/jpeg",
@@ -102,13 +61,8 @@ function admissionDocumentFileFilter(
     "application/pdf",
   ];
 
-  if (
-    allowedDocumentTypes.includes(
-      file.mimetype,
-    )
-  ) {
+  if (allowedDocumentTypes.includes(file.mimetype)) {
     cb(null, true);
-
     return;
   }
 
@@ -120,148 +74,136 @@ function admissionDocumentFileFilter(
 }
 
 /* =========================================================
+   TEAM MEMBER FILE FILTER
+========================================================= */
+
+function teamMemberFileFilter(
+  _req: any,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback,
+) {
+  if (file.fieldname === "image") {
+    const allowedImageTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (allowedImageTypes.includes(file.mimetype)) {
+      cb(null, true);
+      return;
+    }
+
+    cb(
+      new Error(
+        "Team photographs must be JPEG, PNG, or WEBP images",
+      ),
+    );
+    return;
+  }
+
+  if (file.fieldname === "cv") {
+    const allowedCvTypes: Record<string, string[]> = {
+      ".pdf": ["application/pdf"],
+      ".doc": ["application/msword"],
+      ".docx": [
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ],
+    };
+
+    const extension = extname(file.originalname).toLowerCase();
+    const allowedMimeTypes = allowedCvTypes[extension];
+
+    if (
+      allowedMimeTypes &&
+      allowedMimeTypes.includes(file.mimetype)
+    ) {
+      cb(null, true);
+      return;
+    }
+
+    cb(
+      new Error(
+        "CV must be a valid PDF, DOC, or DOCX file",
+      ),
+    );
+    return;
+  }
+
+  cb(new Error("Unexpected team member upload field"));
+}
+
+/* =========================================================
    PASSPORT PHOTO UPLOAD
 ========================================================= */
 
-export const uploadPassportPhoto =
-  multer({
-    storage:
-      multer.memoryStorage(),
-
-    fileFilter,
-
-    limits: {
-      fileSize:
-        2 * 1024 * 1024,
-    },
-  }).single(
-    "passportPhoto",
-  );
+export const uploadPassportPhoto = multer({
+  storage: multer.memoryStorage(),
+  fileFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+  },
+}).single("passportPhoto");
 
 /* =========================================================
    HERO IMAGE UPLOAD
 ========================================================= */
 
-export const uploadHeroImage =
-  multer({
-    storage:
-      multer.memoryStorage(),
+export const uploadHeroImage = multer({
+  storage: multer.memoryStorage(),
+  fileFilter,
+  limits: {
+    fileSize: 4 * 1024 * 1024,
+  },
+}).single("image");
 
-    fileFilter,
+/* =========================================================
+   TEAM MEMBER UPLOAD
+========================================================= */
 
-    limits: {
-      fileSize:
-        4 * 1024 * 1024,
-    },
-  }).single(
-    "image",
-  );
+/**
+ * Multipart fields:
+ * - image: one profile photograph, maximum 4 MB
+ * - cv: one PDF, DOC, or DOCX CV, maximum 5 MB
+ *
+ * Multer applies fileSize per file.
+ * Controllers must read req.files, not req.file.
+ */
+export const uploadTeamMemberFiles = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: teamMemberFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    files: 2,
+    fields: 20,
+  },
+}).fields([
+  {
+    name: "image",
+    maxCount: 1,
+  },
+  {
+    name: "cv",
+    maxCount: 1,
+  },
+]);
 
 /* =========================================================
    ADMISSION DOCUMENT UPLOAD
 ========================================================= */
 
-/*
- * IMPORTANT:
- *
- * This uses multer.fields().
- *
- * Therefore the controller MUST use:
- *
- *     req.files
- *
- * and NOT:
- *
- *     req.file
- */
-
-export const uploadAdmissionDocuments =
-  multer({
-    storage:
-      multer.memoryStorage(),
-
-    fileFilter:
-      admissionDocumentFileFilter,
-
-    limits: {
-      fileSize:
-        5 * 1024 * 1024,
-    },
-  }).fields([
-    /* -----------------------------------------------------
-       PASSPORT
-    ----------------------------------------------------- */
-
-    {
-      name:
-        "passportPhoto",
-
-      maxCount: 1,
-    },
-
-    /* -----------------------------------------------------
-       PRIMARY SCHOOL
-    ----------------------------------------------------- */
-
-    {
-      name:
-        "primarySchoolCertificate",
-
-      maxCount: 1,
-    },
-
-    /* -----------------------------------------------------
-       SECONDARY SCHOOL
-    ----------------------------------------------------- */
-
-    {
-      name:
-        "secondarySchoolCertificate",
-
-      maxCount: 1,
-    },
-
-    /* -----------------------------------------------------
-       BIRTH CERTIFICATE
-    ----------------------------------------------------- */
-
-    {
-      name:
-        "birthCertificate",
-
-      maxCount: 1,
-    },
-
-    /* -----------------------------------------------------
-       WAEC / NECO
-    ----------------------------------------------------- */
-
-    {
-      name:
-        "waecNecoResult",
-
-      maxCount: 1,
-    },
-
-    /* -----------------------------------------------------
-       TESTIMONIAL
-    ----------------------------------------------------- */
-
-    {
-      name:
-        "testimonial",
-
-      maxCount: 1,
-    },
-
-    /* -----------------------------------------------------
-       STATE OF ORIGIN
-    ----------------------------------------------------- */
-
-    {
-      name:
-        "stateOfOriginCertificate",
-
-      maxCount: 1,
-    },
-  ]);
+export const uploadAdmissionDocuments = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: admissionDocumentFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+}).fields([
+  { name: "passportPhoto", maxCount: 1 },
+  { name: "primarySchoolCertificate", maxCount: 1 },
+  { name: "secondarySchoolCertificate", maxCount: 1 },
+  { name: "birthCertificate", maxCount: 1 },
+  { name: "waecNecoResult", maxCount: 1 },
+  { name: "testimonial", maxCount: 1 },
+  { name: "stateOfOriginCertificate", maxCount: 1 },
+]);

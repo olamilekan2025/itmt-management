@@ -1,12 +1,4 @@
-import {
-  Building2,
-  GraduationCap,
-  Wallet,
-  BookOpen,
-  ArrowRight,
-} from "lucide-react";
-
-import { Card, CardContent } from "@/components/ui/card";
+import { BookOpen, Building2, GraduationCap, Wallet } from "lucide-react";
 
 const roles = [
   {
@@ -17,8 +9,7 @@ const roles = [
   },
   {
     title: "Lecturer",
-    description:
-      "Manage assigned courses and academic responsibilities.",
+    description: "Manage assigned courses and academic responsibilities.",
     icon: BookOpen,
   },
   {
@@ -35,55 +26,67 @@ const roles = [
   },
 ];
 
+function EcosystemCard({ role }: { role: (typeof roles)[number] }) {
+  const Icon = role.icon;
+
+  return (
+    <article className="group relative flex h-full flex-col rounded-2xl border border-slate-200/70 border-t-[3px] border-t-brand-gold bg-white p-6 shadow-[0_2px_4px_rgba(15,23,42,0.03),0_14px_32px_-16px_rgba(15,23,42,0.14)] transition-all duration-300 hover:-translate-y-1 hover:border-t-brand-navy hover:shadow-[0_26px_48px_-20px_rgba(15,23,42,0.22)]">
+      <div className="flex items-start gap-4">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-navy/[0.06] text-brand-navy transition-colors duration-300 group-hover:bg-brand-navy group-hover:text-brand-gold">
+          <Icon size={22} aria-hidden="true" />
+        </span>
+
+        <div>
+          <h3 className="text-lg font-bold tracking-[-0.01em] text-brand-navy">
+            {role.title}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {role.description}
+          </p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function AboutEcosystem() {
   return (
-    <section className="bg-white py-20 md:py-24 lg:py-32">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-gold">
-            The ITMT Ecosystem
-          </p>
+    <section className="relative overflow-hidden bg-[#FFFFFF] py-20 sm:py-24 lg:py-28">
+      <div aria-hidden="true" className="pointer-events-none absolute -right-40 top-20 h-96 w-96 rounded-full bg-brand-gold/[0.07] blur-3xl" />
 
-          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-brand-navy sm:text-4xl">
+      <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl font-bold tracking-[-0.03em] text-brand-navy sm:text-4xl lg:text-5xl">
             Everything works together.
           </h2>
-
-          <p className="mt-4 text-base leading-7 text-slate-600">
+          <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
             ITMT connects the major areas of institutional management so
             information can move between the people and processes that depend
             on it.
           </p>
         </div>
 
-        {/* Desktop ecosystem */}
-        <div className="relative mx-auto mt-16 hidden max-w-5xl lg:block">
-          <div className="absolute left-1/2 top-1/2 h-px w-[70%] -translate-x-1/2 bg-slate-200" />
+        {/* Desktop */}
+        <div className="relative mx-auto mt-16 hidden max-w-6xl lg:block">
+          <div aria-hidden="true" className="absolute left-0 right-0 top-1/2 h-px bg-gradient-to-r from-transparent via-brand-gold/50 to-transparent" />
 
-          <div className="absolute left-1/2 top-1/2 h-[70%] w-px -translate-y-1/2 bg-slate-200" />
-
-          <div className="grid grid-cols-3 items-center gap-10">
-            <div className="space-y-10">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-12">
+            <div className="relative z-10 space-y-6">
               <EcosystemCard role={roles[0]} />
               <EcosystemCard role={roles[3]} />
             </div>
 
-            <div className="flex justify-center">
-              <div className="relative z-10 flex h-40 w-40 items-center justify-center rounded-2xl border border-brand-navy bg-brand-navy text-center shadow-xl">
-                <div>
-                  <p className="text-sm font-bold tracking-[0.2em] text-brand-gold">
-                    ITMT
-                  </p>
-
-                  <p className="mt-2 text-xs text-white/60">
-                    MANAGEMENT
-                    <br />
-                    SYSTEM
-                  </p>
-                </div>
-              </div>
+            <div className="relative z-10 flex h-48 w-48 flex-col items-center justify-center rounded-[2rem] bg-brand-navy text-center shadow-[0_30px_70px_-24px_rgba(15,23,42,0.6)] ring-8 ring-white">
+              <div aria-hidden="true" className="absolute -inset-6 rounded-[2.5rem] border border-brand-gold/25" />
+              <p className="text-xl font-bold tracking-[0.14em] text-brand-gold">ITMT</p>
+              <p className="mt-2 text-xs leading-4 text-white/60">
+                Management
+                <br />
+                System
+              </p>
             </div>
 
-            <div className="space-y-10">
+            <div className="relative z-10 space-y-6">
               <EcosystemCard role={roles[1]} />
               <EcosystemCard role={roles[2]} />
             </div>
@@ -98,37 +101,5 @@ export default function AboutEcosystem() {
         </div>
       </div>
     </section>
-  );
-}
-
-function EcosystemCard({
-  role,
-}: {
-  role: (typeof roles)[number];
-}) {
-  const Icon = role.icon;
-
-  return (
-    <Card className="group border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-brand-gold/30 hover:shadow-lg">
-      <CardContent className="p-6">
-        <div className="flex items-start gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand-navy transition-colors group-hover:bg-brand-navy group-hover:text-brand-gold">
-            <Icon className="h-5 w-5" />
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-brand-navy">
-              {role.title}
-            </h3>
-
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              {role.description}
-            </p>
-          </div>
-        </div>
-
-        <ArrowRight className="mt-5 h-4 w-4 text-brand-gold opacity-0 transition-opacity group-hover:opacity-100" />
-      </CardContent>
-    </Card>
   );
 }

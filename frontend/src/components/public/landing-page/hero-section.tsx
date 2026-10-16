@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -12,197 +13,195 @@ interface Slide {
   subtext: string;
 }
 
-const SLIDE_DURATION = 8000;
-
+const SLIDE_DURATION = 7000;
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+const FALLBACK_SLIDE: Slide = {
+  _id: "itmt-default",
+  imageUrl: "/itmt-image-hero.jpg",
+  eyebrow: "ITMT Academy",
+  headline: "Institute of Transport and Management Technology",
+  subtext:
+    "Excellence in transport, management, technology, and professional education.",
+};
 
 export default function HeroSection() {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!API_URL) {
       console.error("NEXT_PUBLIC_API_URL is not configured.");
-      setSlides([]);
-      setIsLoading(false);
       return;
     }
 
-    const loadSlides = async () => {
+    const controller = new AbortController();
+
+    async function loadSlides() {
       try {
         const response = await fetch(`${API_URL}/api/hero-slides`, {
+          signal: controller.signal,
           cache: "no-store",
         });
 
         if (!response.ok) {
-          throw new Error(
-            `Failed to fetch hero slides: ${response.status}`
-          );
+          throw new Error(`Failed to fetch hero slides: ${response.status}`);
         }
 
         const data = await response.json();
 
-        setSlides(Array.isArray(data.slides) ? data.slides : []);
-      } catch (error) {
-        console.error("Failed to load hero slides:", error);
-        setSlides([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+        if (Array.isArray(data.slides)) {
+          const validSlides = data.slides.filter(
+            (slide: Slide) =>
+              slide &&
+              typeof slide._id === "string" &&
+              typeof slide.imageUrl === "string" &&
+              typeof slide.headline === "string" &&
+              slide.imageUrl.trim().length > 0
+          );
 
-    loadSlides();
+          setSlides(validSlides);
+          setActiveIndex(0);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error("Failed to load hero slides:", error);
+        }
+      }
+    }
+
+    void loadSlides();
+
+    return () => controller.abort();
   }, []);
 
-  useEffect(() => {
-    if (slides.length < 2) return;
+  // Use the local hero immediately while the API loads.
+  const displaySlides = slides.length > 0 ? slides : [FALLBACK_SLIDE];
+  const active = displaySlides[activeIndex] ?? displaySlides[0];
 
-    const interval = setInterval(() => {
-      setActiveIndex((current) => (current + 1) % slides.length);
+  useEffect(() => {
+    if (displaySlides.length < 2) return;
+
+    const interval = window.setInterval(() => {
+      setActiveIndex((current) => (current + 1) % displaySlides.length);
     }, SLIDE_DURATION);
 
-    return () => clearInterval(interval);
-  }, [slides.length]);
-
-  if (isLoading) {
-    return (
-      <section
-        className="h-[640px] bg-brand-navy md:h-[600px]"
-        aria-label="Loading hero"
-      />
-    );
-  }
-
-if (slides.length === 0) {
-  return (
-    <section className="relative h-[640px] overflow-hidden bg-brand-navy md:h-[655px]">
-      {/* Background image */}
-      <Image
-        src="/itmt-image-hero.jpg"
-        alt="Institute of Transport and Management Technology"
-        fill
-        priority
-        className="object-cover"
-      />
-
-      {/* Dark overlay */}
-      <div className="absolute inset-0 bg-brand-navy/65" />
-
-      {/* Text */}
-      <div className="relative z-10 flex h-full items-center justify-center px-6 text-center">
-        <div className="max-w-4xl">
-          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.3em] text-brand-gold">
-            ITMT Academy
-          </p>
-
-          <h1 className="text-3xl font-bold uppercase leading-tight tracking-wide text-white sm:text-4xl md:text-5xl lg:text-6xl">
-            Institute of Transport and Management Technology
-          </h1>
-
-          <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-white/80 md:text-lg">
-            Excellence in transport, management, technology, and professional
-            education.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-  const active = slides[activeIndex];
+    return () => window.clearInterval(interval);
+  }, [displaySlides.length]);
 
   return (
-    <section className="relative h-[640px] overflow-hidden bg-brand-navy md:h-[600px]">
-      {/* Background images */}
-      {slides.map((slide, index) => (
+    <section
+      className="relative isolate min-h-[580px] overflow-hidden bg-[#101d32] sm:min-h-[620px] lg:min-h-[680px]"
+      aria-label="ITMT introduction"
+    >
+      {/* Slide images */}
+      {displaySlides.map((slide, index) => (
         <div
           key={slide._id}
-          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+          className={`absolute inset-0 transition-opacity duration-500 ease-in-out motion-reduce:transition-none ${
             index === activeIndex ? "opacity-100" : "opacity-0"
           }`}
-          aria-hidden={index !== activeIndex}
+          aria-hidden="true"
         >
           <Image
             src={slide.imageUrl}
             alt=""
             fill
             priority={index === 0}
+            loading={index === 0 ? "eager" : "lazy"}
+            quality={85}
             sizes="100vw"
-            className="object-cover"
+            className="object-cover object-center"
           />
         </div>
       ))}
 
-      {/* Dark brand overlay */}
+      {/* Lighter overlay: protects text readability without hiding photos */}
       <div
         className="pointer-events-none absolute inset-0"
+        aria-hidden="true"
         style={{
           background:
-            "linear-gradient(135deg, rgba(29, 31, 34, 0.92) 0%, rgba(39, 47, 58, 0.75) 45%, rgba(50, 56, 65, 0.35) 100%)",
+            "linear-gradient(90deg, rgba(10, 23, 43, 0.78) 0%, rgba(10, 23, 43, 0.58) 48%, rgba(10, 23, 43, 0.30) 100%)",
         }}
       />
 
+      {/* Subtle bottom contrast */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#101d32]/40 via-transparent to-[#101d32]/10"
+        aria-hidden="true"
+      />
+
       {/* Hero content */}
-      <div className="relative flex h-full items-center">
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-center px-6 text-center">
-          <div className="flex w-full max-w-4xl flex-col items-center">
-            <p
-              key={`eyebrow-${activeIndex}`}
-              className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-gold transition-opacity duration-700"
+      <div className="relative z-10 flex min-h-[580px] items-center justify-center px-5 py-20 sm:min-h-[620px] sm:px-8 lg:min-h-[680px]">
+        <div
+          className="mx-auto w-full max-w-5xl text-center"
+          aria-live="off"
+        >
+          <p
+            key={`eyebrow-${active._id}`}
+            className="text-xs font-bold uppercase tracking-[0.24em] text-[#f5c76a] sm:text-sm"
+          >
+            {active.eyebrow}
+          </p>
+
+          <h1
+            key={`headline-${active._id}`}
+            className="mx-auto mt-5 max-w-4xl text-3xl font-bold leading-[1.15] tracking-tight text-white sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl"
+          >
+            {active.headline}
+          </h1>
+
+          <p
+            key={`subtext-${active._id}`}
+            className="mx-auto mt-6 max-w-2xl text-base leading-7 text-white/90 sm:text-lg sm:leading-8"
+          >
+            {active.subtext}
+          </p>
+
+          <div className="mt-9 flex flex-col items-stretch justify-center gap-4 sm:flex-row sm:items-center">
+            <Link
+              href="/auth/login"
+              className="inline-flex min-h-12 items-center justify-center rounded-lg bg-[#f5c76a] px-7 py-3.5 text-sm font-bold text-[#101d32] shadow-lg transition-colors hover:bg-[#ffda8c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#101d32]"
             >
-              {active.eyebrow}
-            </p>
+              Sign in to your dashboard
+              <span className="ml-2" aria-hidden="true">
+                →
+              </span>
+            </Link>
 
-            <h1
-              key={`headline-${activeIndex}`}
-              className="mt-4 max-w-4xl font-serif text-4xl font-medium leading-tight text-white transition-opacity duration-700 md:text-5xl lg:text-6xl"
+            <a
+              href="#offices"
+              className="inline-flex min-h-12 items-center justify-center rounded-lg border border-white/60 bg-white/5 px-7 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
-              {active.headline}
-            </h1>
-
-            <p
-              key={`subtext-${activeIndex}`}
-              className="mt-6 max-w-2xl text-base leading-relaxed text-white/70 transition-opacity duration-700 md:text-lg"
-            >
-              {active.subtext}
-            </p>
-
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-              <Link
-                href="/auth/login"
-                className="rounded-lg bg-white px-6 py-3 text-sm font-medium text-brand-navy transition-all duration-200 hover:bg-white/90 hover:shadow-lg"
-              >
-                Sign in to your dashboard
-              </Link>
-
-              <a
-                href="#offices"
-                className="text-sm font-medium text-white/80 transition-colors hover:text-white"
-              >
-                See how it works
-              </a>
-            </div>
+              See how it works
+            </a>
           </div>
 
-          {/* Slide controls */}
-          {slides.length > 1 && (
-            <div className="mt-16 flex items-center justify-center gap-2">
-              {slides.map((slide, index) => (
+          {/* Accessible slide controls */}
+          {displaySlides.length > 1 && (
+            <div
+              className="mt-12 flex items-center justify-center gap-3"
+              role="group"
+              aria-label="Hero slide controls"
+            >
+              {displaySlides.map((slide, index) => (
                 <button
                   key={slide._id}
                   type="button"
-                  aria-label={`Show slide ${index + 1}`}
-                  aria-current={
-                    index === activeIndex ? "true" : undefined
-                  }
+                  aria-label={`Show slide ${index + 1}: ${slide.headline}`}
+                  aria-pressed={index === activeIndex}
                   onClick={() => setActiveIndex(index)}
-                  className={`h-1.5 rounded-full transition-all duration-500 ${
-                    index === activeIndex
-                      ? "w-8 bg-brand-gold"
-                      : "w-1.5 bg-white/30 hover:bg-white/50"
-                  }`}
-                />
+                  className={`flex h-11 min-w-11 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5c76a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#101d32]`}
+                >
+                  <span
+                    className={`block h-1.5 rounded-full transition-all duration-300 ${
+                      index === activeIndex
+                        ? "w-8 bg-[#f5c76a]"
+                        : "w-2 bg-white/60 hover:bg-white"
+                    }`}
+                  />
+                </button>
               ))}
             </div>
           )}
@@ -211,4 +210,3 @@ if (slides.length === 0) {
     </section>
   );
 }
-

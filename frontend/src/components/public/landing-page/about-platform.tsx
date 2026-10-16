@@ -1,433 +1,310 @@
+
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
+  ArrowDownRight,
   ArrowRight,
-  ArrowUpRight,
+  BookOpen,
   Building2,
+  Check,
   GraduationCap,
-  Landmark,
   Layers3,
-  Users,
+  ShieldCheck,
+  WalletCards,
   type LucideIcon,
 } from "lucide-react";
 
 interface PlatformRole {
+  number: string;
   title: string;
   description: string;
   icon: LucideIcon;
-  position: "top" | "left" | "bottom" | "right";
 }
 
 const platformRoles: PlatformRole[] = [
   {
+    number: "01",
     title: "Students",
-    description: "Academic & student services",
-    icon: Users,
-    position: "top",
-  },
-  {
-    title: "Lecturers",
-    description: "Teaching & academic activities",
+    description: "Learning, registration and academic progress.",
     icon: GraduationCap,
-    position: "left",
   },
   {
+    number: "02",
+    title: "Lecturers",
+    description: "Teaching, attendance and student assessment.",
+    icon: BookOpen,
+  },
+  {
+    number: "03",
     title: "Administration",
-    description: "Institutional management",
+    description: "Academic operations and institutional records.",
     icon: Building2,
-    position: "bottom",
   },
   {
+    number: "04",
     title: "Finance",
-    description: "Fees & payment management",
-    icon: Landmark,
-    position: "right",
+    description: "Payments, fee management and financial records.",
+    icon: WalletCards,
   },
 ];
 
+const benefits = [
+  "Connected academic workflows",
+  "Secure, role-based access",
+  "Centralized institutional records",
+];
+
 export default function AboutPlatform() {
+  const shouldReduceMotion = useReducedMotion();
+
+  const reveal = {
+    initial: shouldReduceMotion
+      ? false
+      : { opacity: 0, y: 16 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true, amount: 0.15 },
+    transition: {
+      duration: shouldReduceMotion ? 0 : 0.5,
+      ease: "easeOut" as const,
+    },
+  };
+
   return (
-    <section className="relative overflow-hidden bg-brand-light py-20 md:py-24">
-      {/* Background atmosphere */}
-      <div className="pointer-events-none absolute -left-32 top-1/4 h-72 w-72 rounded-full bg-brand-blue/[0.035] blur-3xl" />
-      <div className="pointer-events-none absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-brand-gold/[0.05] blur-3xl" />
+    <section
+      aria-labelledby="about-platform-heading"
+     className="relative isolate overflow-hidden bg-[#FFFFFF] py-20 sm:py-24 lg:py-32"
+    >
+      {/* Subtle background detail */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-40 top-24 -z-10 h-80 w-80 rounded-full bg-[#C8A951]/[0.07] blur-3xl"
+      />
 
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid items-center gap-14 lg:grid-cols-[0.88fr_1.12fr] lg:gap-16 xl:gap-24">
-          {/* ─────────────────────────────────────────
-              LEFT — CONTENT
-          ───────────────────────────────────────── */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, amount: 0.25 }}
-            transition={{
-              duration: 0.6,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-            className="max-w-xl"
-          >
-            {/* Eyebrow */}
-            <div className="mb-5 flex items-center gap-3">
-              <span className="h-px w-8 bg-brand-gold" />
+      <div className="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-14 xl:px-20">
+        <div className="grid items-center gap-12 lg:grid-cols-[0.88fr_1.12fr] lg:gap-16 xl:gap-24">
+          {/* LEFT: Editorial introduction */}
+          <motion.div {...reveal} className="relative z-10">
+            <div className="mb-7 flex items-center gap-3">
+              <span className="h-px w-10 bg-[#B59643]" />
 
-              <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-brand-navy">
-                About ITMT
+              <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#9B7A2C]">
+                The ITMT Ecosystem
               </span>
             </div>
 
-            {/* Heading */}
-            <h2 className="font-serif text-3xl font-medium leading-[1.12] tracking-tight text-brand-navy sm:text-4xl lg:text-[46px]">
-              One platform.
-              <span className="block text-brand-blue">
-                Every part of the institution.
+            <h2
+              id="about-platform-heading"
+              className="max-w-[570px] text-[clamp(2.65rem,5vw,4.4rem)] font-semibold leading-[1.06] tracking-[-0.065em] text-[#172541]"
+            >
+              One institution.
+              <span className="mt-1 block text-[#9C7D37]">
+                One connected
               </span>
+              <span className="block">experience.</span>
             </h2>
 
-            {/* Main description */}
-            <p className="mt-6 max-w-lg text-base leading-7 text-slate-600 md:text-[17px]">
-              From student enrollment to academic results and financial
-              management, ITMT connects the people, processes, and information
-              that keep an institution moving.
+            <p className="mt-7 max-w-[470px] text-[15px] leading-8 text-slate-600 sm:text-base">
+              Education works better when every part of the institution
+              works together. ITMT brings students, lecturers,
+              administrators and finance teams into one coordinated
+              management environment.
             </p>
 
-            <p className="mt-4 max-w-lg text-sm leading-6 text-slate-500">
-              Every role has its own responsibilities and tools, while
-              remaining part of one connected academic environment.
+            <p className="mt-4 max-w-[450px] text-sm leading-7 text-slate-500">
+              From everyday academic activities to institutional
+              operations, the right tools and information are organized
+              around the people who need them.
             </p>
 
-            {/* Institutional points */}
-            <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-slate-200 py-6">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-navy text-[9px] font-bold text-brand-gold">
-                  ✓
-                </span>
-                <span className="text-xs font-semibold text-brand-navy">
-                  Connected workflows
-                </span>
-              </div>
+            {/* Benefits: simple, understated list */}
+            <div className="mt-8 space-y-4 border-t border-[#E6E2D9] pt-6">
+              {benefits.map((benefit) => (
+                <div key={benefit} className="flex items-center gap-3">
+                  <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#EAE5D8] text-[#7F672D]">
+                    <Check size={12} strokeWidth={2.5} />
+                  </span>
 
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-navy text-[9px] font-bold text-brand-gold">
-                  ✓
-                </span>
-                <span className="text-xs font-semibold text-brand-navy">
-                  Role-based access
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-navy text-[9px] font-bold text-brand-gold">
-                  ✓
-                </span>
-                <span className="text-xs font-semibold text-brand-navy">
-                  Centralized records
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-navy text-[9px] font-bold text-brand-gold">
-                  ✓
-                </span>
-                <span className="text-xs font-semibold text-brand-navy">
-                  Real-time information
-                </span>
-              </div>
+                  <span className="text-sm font-medium text-[#26344D]">
+                    {benefit}
+                  </span>
+                </div>
+              ))}
             </div>
 
-            {/* CTA */}
-            <Link
-              href="/about"
-              className="
-                group mt-8 inline-flex items-center gap-3
-                text-sm font-bold
-                text-brand-navy
-                transition-colors
-                hover:text-brand-gold
-              "
-            >
-              <span>Discover the ITMT platform</span>
-
-              <span
-                className="
-                  flex h-8 w-8 items-center justify-center
-                  rounded-full
-                  border border-brand-navy/15
-                  transition-all duration-300
-                  group-hover:border-brand-gold
-                  group-hover:bg-brand-gold
-                "
+            <div className="mt-9 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+              <Link
+                href="/about"
+                className="group inline-flex min-h-[54px] items-center justify-center gap-4 rounded-md bg-[#172541] px-6 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#263B60] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B59643] focus-visible:ring-offset-2"
               >
-                <ArrowRight
-                  className="
-                    h-3.5 w-3.5
-                    transition-transform duration-300
-                    group-hover:translate-x-0.5
-                  "
-                />
+                Discover our platform
+
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 transition-transform duration-200 group-hover:translate-x-1">
+                  <ArrowRight size={15} />
+                </span>
+              </Link>
+
+              <span className="inline-flex items-center gap-2 text-xs font-medium tracking-wide text-slate-500">
+                <ShieldCheck size={15} className="text-[#9B7A2C]" />
+                Structured. Connected. Accountable.
               </span>
-            </Link>
+            </div>
           </motion.div>
 
-          {/* ─────────────────────────────────────────
-              RIGHT — PLATFORM ECOSYSTEM
-          ───────────────────────────────────────── */}
+          {/* RIGHT: Institutional ecosystem visual */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, amount: 0.25 }}
+            {...reveal}
             transition={{
-              duration: 0.65,
-              ease: [0.22, 1, 0.36, 1],
+              duration: shouldReduceMotion ? 0 : 0.55,
+              delay: shouldReduceMotion ? 0 : 0.08,
+              ease: "easeOut",
             }}
-            className="relative mx-auto w-full max-w-2xl"
+            className="relative min-w-0"
           >
-            {/* Main ecosystem container */}
-            <div
-              className="
-                relative overflow-hidden
-                rounded-[28px]
-                border border-slate-200/80
-                bg-white
-                p-5
-                shadow-[0_20px_60px_rgba(15,23,42,0.08)]
-                sm:p-7
-              "
-            >
-              {/* Top bar */}
-              <div className="relative z-20 mb-5 flex items-center justify-between border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-navy text-brand-gold">
-                    <Layers3 className="h-4 w-4" />
+            <div className="relative overflow-hidden rounded-[20px] bg-[#172541] px-5 py-6 shadow-[0_28px_80px_-35px_rgba(23,37,65,0.4)] sm:px-8 sm:py-8 lg:px-9 lg:py-9">
+              {/* Decorative background elements */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full border border-white/[0.07]"
+              />
+
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-8 -top-12 h-48 w-48 rounded-full border border-[#C8A951]/15"
+              />
+
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute bottom-0 left-0 h-48 w-full bg-gradient-to-t from-black/[0.12] to-transparent"
+              />
+
+              <div className="relative">
+                {/* Panel heading */}
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#D5BB73]">
+                      Built around your institution
+                    </p>
+
+                    <h3 className="mt-3 text-xl font-semibold tracking-tight text-white sm:text-2xl">
+                      Everything works
+                      <br className="hidden sm:block" />{" "}
+                      better together.
+                    </h3>
                   </div>
 
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-navy">
-                      ITMT Ecosystem
-                    </p>
-
-                    <p className="mt-0.5 text-[10px] text-slate-400">
-                      One connected academic environment
-                    </p>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-[#D5BB73]">
+                    <Layers3 size={23} strokeWidth={1.5} />
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                    Connected
+                {/* Central platform */}
+                <div className="relative mx-auto mt-9 max-w-[440px]">
+                  {/* Connecting lines behind the role items */}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-1/2 top-[112px] hidden h-[54px] w-[calc(100%-100px)] -translate-x-1/2 border-x border-t border-[#C8A951]/40 sm:block"
+                  />
+
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-1/2 top-[112px] h-[55px] w-px -translate-x-1/2 bg-[#C8A951]/40"
+                  />
+
+                  <div className="relative z-10 mx-auto flex min-h-[116px] max-w-[300px] items-center gap-4 rounded-xl border border-[#D6BE7A]/40 bg-[#233451] px-5 py-5 shadow-[0_12px_35px_-20px_rgba(0,0,0,0.7)] sm:px-6">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#D0B56B] text-[#172541]">
+                      <Building2 size={23} strokeWidth={1.7} />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#D5BB73]">
+                        Central platform
+                      </p>
+
+                      <p className="mt-1 text-base font-semibold text-white">
+                        ITMT Academy
+                      </p>
+
+                      <p className="mt-1 text-xs leading-5 text-slate-300">
+                        One coordinated system
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Gold connector point */}
+                  <div
+                    aria-hidden="true"
+                    className="relative z-10 mx-auto my-4 h-2 w-2 rounded-full bg-[#D5BB73] ring-4 ring-[#D5BB73]/10"
+                  />
+
+                  {/* Four institutional roles */}
+                  <div className="relative z-10 grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
+                    {platformRoles.map((role) => {
+                      const Icon = role.icon;
+
+                      return (
+                        <article
+                          key={role.number}
+                          className="group flex min-w-0 items-start gap-3 rounded-lg border border-white/[0.09] bg-white/[0.045] p-4 transition-colors duration-200 hover:border-[#D5BB73]/40 hover:bg-white/[0.075] sm:min-h-[116px] sm:p-4"
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#D5BB73]/10 text-[#D5BB73] transition-colors duration-200 group-hover:bg-[#D5BB73] group-hover:text-[#172541]">
+                            <Icon size={19} strokeWidth={1.7} />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1.5 flex items-center justify-between gap-2">
+                              <span className="text-[9px] font-semibold tracking-[0.16em] text-[#D5BB73]/80">
+                                {role.number}
+                              </span>
+
+                              <ArrowDownRight
+                                size={13}
+                                className="text-white/25 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:translate-y-0.5 group-hover:text-[#D5BB73]"
+                              />
+                            </div>
+
+                            <h4 className="text-sm font-semibold text-white">
+                              {role.title}
+                            </h4>
+
+                            <p className="mt-1.5 text-[11px] leading-[1.7] text-slate-300/75">
+                              {role.description}
+                            </p>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Panel footer */}
+                <div className="mt-7 flex items-center justify-between gap-3 border-t border-white/10 pt-5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-[#D5BB73]">
+                      <ShieldCheck size={15} />
+                    </span>
+
+                    <p className="max-w-[230px] text-[11px] leading-5 text-slate-300">
+                      Every role. The right access. A shared direction.
+                    </p>
+                  </div>
+
+                  <span className="hidden text-[10px] font-semibold uppercase tracking-[0.15em] text-[#D5BB73]/80 sm:block">
+                    ITMT
                   </span>
                 </div>
               </div>
-
-              {/* Desktop ecosystem */}
-              <div className="relative hidden min-h-[430px] md:block">
-                {/* Soft center glow */}
-                <div className="pointer-events-none absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-blue/[0.05] blur-3xl" />
-
-                {/* Connection system */}
-                <div className="pointer-events-none absolute inset-0">
-                  {/* Vertical */}
-                  <div className="absolute left-1/2 top-[78px] h-[102px] w-px -translate-x-1/2 bg-slate-200" />
-
-                  <div className="absolute bottom-[78px] left-1/2 h-[102px] w-px -translate-x-1/2 bg-slate-200" />
-
-                  {/* Horizontal */}
-                  <div className="absolute left-[76px] top-1/2 h-px w-[calc(50%-76px)] bg-slate-200" />
-
-                  <div className="absolute right-[76px] top-1/2 h-px w-[calc(50%-76px)] bg-slate-200" />
-
-                  {/* Gold connection points */}
-                  <span className="absolute left-1/2 top-[174px] h-2 w-2 -translate-x-1/2 rounded-full bg-brand-gold ring-4 ring-white" />
-
-                  <span className="absolute left-[174px] top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-gold ring-4 ring-white" />
-
-                  <span className="absolute bottom-[174px] left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-brand-gold ring-4 ring-white" />
-
-                  <span className="absolute right-[174px] top-1/2 h-2 w-2 translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-gold ring-4 ring-white" />
-                </div>
-
-                {/* Center platform */}
-                <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
-                  <div className="relative flex h-32 w-32 items-center justify-center rounded-[30px] bg-brand-navy shadow-[0_18px_45px_rgba(15,23,42,0.22)]">
-                    <div className="absolute inset-2 rounded-[24px] border border-white/10" />
-
-                    <div className="absolute -inset-3 rounded-[34px] border border-brand-gold/10" />
-
-                    <div className="relative text-center">
-                      <p className="text-2xl font-bold tracking-tight text-white">
-                        ITMT
-                      </p>
-
-                      <div className="mx-auto mt-1 h-px w-7 bg-brand-gold" />
-
-                      <p className="mt-2 text-[8px] font-bold uppercase tracking-[0.22em] text-brand-gold">
-                        Platform
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Role cards */}
-                {platformRoles.map((role, index) => {
-                  const Icon = role.icon;
-
-                  const positionClasses = {
-                    top: "left-1/2 top-0 -translate-x-1/2",
-                    left: "left-0 top-1/2 -translate-y-1/2",
-                    bottom: "bottom-0 left-1/2 -translate-x-1/2",
-                    right: "right-0 top-1/2 -translate-y-1/2",
-                  };
-
-                  return (
-                    <motion.div
-                      key={role.title}
-                      initial={{ opacity: 0, scale: 0.94 }}
-                      whileInView={{ opacity: 1, scale: 1 }}
-                      viewport={{ once: true }}
-                      transition={{
-                        duration: 0.4,
-                        delay: 0.15 + index * 0.08,
-                      }}
-                      className={`absolute ${positionClasses[role.position]}`}
-                    >
-                      <div className="group/role flex w-36 flex-col items-center text-center">
-                        <div
-                          className="
-                            relative flex h-[68px] w-[68px]
-                            items-center justify-center
-                            rounded-2xl
-                            border border-slate-200
-                            bg-white
-                            text-brand-navy
-                            shadow-[0_5px_18px_rgba(15,23,42,0.07)]
-                            transition-all duration-300
-                            group-hover/role:-translate-y-1
-                            group-hover/role:border-brand-gold/40
-                            group-hover/role:shadow-lg
-                          "
-                        >
-                          <div className="absolute inset-1 rounded-xl border border-slate-100" />
-
-                          <Icon
-                            className="relative h-6 w-6"
-                            strokeWidth={1.7}
-                          />
-
-                          {/* Gold status point */}
-                          <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-brand-gold" />
-                        </div>
-
-                        <p className="mt-3 text-[13px] font-bold text-brand-navy">
-                          {role.title}
-                        </p>
-
-                        <p className="mt-1 text-[10px] leading-4 text-slate-400">
-                          {role.description}
-                        </p>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-
-              {/* Mobile ecosystem */}
-              <div className="md:hidden">
-                {/* Center */}
-                <div className="flex justify-center py-5">
-                  <div className="relative flex h-28 w-28 items-center justify-center rounded-[26px] bg-brand-navy shadow-xl shadow-brand-navy/15">
-                    <div className="absolute inset-2 rounded-[20px] border border-white/10" />
-
-                    <div className="text-center">
-                      <p className="text-xl font-bold text-white">ITMT</p>
-
-                      <div className="mx-auto mt-1 h-px w-6 bg-brand-gold" />
-
-                      <p className="mt-2 text-[8px] font-bold uppercase tracking-[0.2em] text-brand-gold">
-                        Platform
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mobile roles */}
-                <div className="grid gap-2.5 sm:grid-cols-2">
-                  {platformRoles.map((role, index) => {
-                    const Icon = role.icon;
-
-                    return (
-                      <motion.div
-                        key={role.title}
-                        initial={{ opacity: 0, y: 10 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{
-                          duration: 0.4,
-                          delay: index * 0.06,
-                        }}
-                        className="
-                          group
-                          flex items-center gap-3
-                          rounded-xl
-                          border border-slate-200
-                          bg-slate-50/70
-                          p-3.5
-                          transition-all duration-300
-                          hover:border-brand-gold/30
-                          hover:bg-white
-                          hover:shadow-md
-                        "
-                      >
-                        <div
-                          className="
-                            flex h-10 w-10 shrink-0
-                            items-center justify-center
-                            rounded-xl
-                            bg-brand-navy
-                            text-brand-gold
-                            transition-transform duration-300
-                            group-hover:scale-105
-                          "
-                        >
-                          <Icon className="h-[18px] w-[18px]" strokeWidth={1.7} />
-                        </div>
-
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-brand-navy">
-                            {role.title}
-                          </p>
-
-                          <p className="mt-0.5 text-[10px] leading-4 text-slate-400">
-                            {role.description}
-                          </p>
-                        </div>
-
-                        <ArrowUpRight
-                          className="
-                            ml-auto h-3.5 w-3.5 shrink-0
-                            text-slate-300
-                            transition-all duration-300
-                            group-hover:-translate-y-0.5
-                            group-hover:translate-x-0.5
-                            group-hover:text-brand-gold
-                          "
-                        />
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </div>
             </div>
 
-            {/* Decorative offset accent */}
-            <div className="pointer-events-none absolute -bottom-4 -right-4 -z-10 h-28 w-28 rounded-full bg-brand-gold/10 blur-2xl" />
-            <div className="pointer-events-none absolute -left-5 top-1/3 -z-10 h-20 w-20 rounded-full bg-brand-blue/[0.06] blur-2xl" />
+            {/* Restrained gold accent */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-3 -right-3 -z-10 h-24 w-24 rounded-full bg-[#C8A951]/20 blur-2xl"
+            />
           </motion.div>
         </div>
       </div>
     </section>
   );
 }
-

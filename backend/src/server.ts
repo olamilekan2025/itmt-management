@@ -38,6 +38,7 @@ import graduationRoutes from "./routes/graduation.routes.js";
 import attendanceRoutes from "./routes/attendance.routes";
 import academicProgressRoutes from "./routes/academic-progress.routes.js";
 import documentRoutes from "./routes/document.routes.js";
+import teamRoutes from "./routes/team.routes.js";
 
 const app = express();
 
@@ -159,6 +160,7 @@ app.use("/api/hero-slides", heroSlideRoutes);
 app.use("/api/fee-categories", feeCategoryRoutes);
 
 app.use("/api/documents", documentRoutes);
+app.use("/api/team", teamRoutes);
 
 /**
  * =========================================================

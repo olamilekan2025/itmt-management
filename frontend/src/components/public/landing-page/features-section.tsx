@@ -1,233 +1,152 @@
 "use client";
 
-import { motion } from "framer-motion";
-
+import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
 import {
-  ArrowUpRight,
+  ArrowRight,
   BookOpen,
   FileText,
   GraduationCap,
-  Settings,
+  Settings2,
   Users,
   WalletCards,
+  type LucideIcon,
 } from "lucide-react";
 
-import FeatureCard from "./feature-card";
+interface Feature {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}
 
-const features = [
+const features: Feature[] = [
   {
-    icon: GraduationCap,
     title: "Academic Management",
     description:
-      "Organize departments, programmes, academic sessions, semesters, and courses from one central platform.",
+      "Manage departments, programmes, academic sessions, semesters, and courses through a unified academic structure.",
+    icon: GraduationCap,
   },
   {
-    icon: Users,
     title: "Student Management",
     description:
-      "Maintain complete student profiles, enrolment information, academic records, and institutional data.",
+      "Maintain student profiles, enrolment details, and academic records within a structured institutional system.",
+    icon: Users,
   },
   {
-    icon: BookOpen,
     title: "Course Registration",
     description:
-      "Make course registration simple for students while giving administrators clear oversight of registrations.",
+      "Simplify course registration while giving authorized staff clear oversight of student enrolments.",
+    icon: BookOpen,
   },
   {
-    icon: FileText,
     title: "Results Management",
     description:
-      "Allow lecturers to submit results, administrators to review and publish them, and students to access results securely.",
+      "Coordinate result submission, administrative review, publication, and access to academic performance records.",
+    icon: FileText,
   },
   {
-    icon: WalletCards,
     title: "Finance Management",
     description:
-      "Manage fee structures, payments, balances, receipts, scholarships, and financial records in one place.",
+      "Organize fee structures, payment transactions, outstanding balances, and receipts in one place.",
+    icon: WalletCards,
   },
   {
-    icon: Settings,
-    title: "Administration",
+    title: "Institutional Administration",
     description:
-      "Give administrators the tools they need to manage users, academic structures, institutional operations, and system settings.",
+      "Oversee users, institutional structures, academic operations, and essential administrative processes.",
+    icon: Settings2,
   },
 ];
 
 export default function FeaturesSection() {
+  const reduce = useReducedMotion();
+
   return (
     <section
       id="features"
-      className="relative overflow-hidden bg-white py-20 md:py-24 lg:py-28"
+      aria-labelledby="features-heading"
+      className="relative overflow-hidden bg-[#FAFAFA] py-20 sm:py-24 lg:py-28"
     >
-      {/* Background atmosphere */}
       <div
         aria-hidden="true"
-        className="
-          pointer-events-none absolute
-          -right-40 top-20
-          h-96 w-96
-          rounded-full
-          bg-brand-blue/[0.035]
-          blur-3xl
-        "
+        className="pointer-events-none absolute -right-40 -top-40 h-96 w-96 rounded-full bg-brand-gold/[0.08] blur-3xl"
       />
 
-      <div
-        aria-hidden="true"
-        className="
-          pointer-events-none absolute
-          -left-40 bottom-10
-          h-96 w-96
-          rounded-full
-          bg-brand-gold/[0.035]
-          blur-3xl
-        "
-      />
-
-      {/* Subtle grid */}
-      <div
-        aria-hidden="true"
-        className="
-          pointer-events-none absolute inset-0
-          opacity-[0.018]
-          [background-image:linear-gradient(rgba(15,23,42,1)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,1)_1px,transparent_1px)]
-          [background-size:48px_48px]
-        "
-      />
-
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Section heading */}
+      <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+        {/* Header */}
         <motion.div
-          initial={{ opacity: 0, y: 18 }}
+          initial={reduce ? false : { opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{
-            duration: 0.55,
-            ease: [0.22, 1, 0.36, 1],
-          }}
-          className="mx-auto max-w-3xl text-center"
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: reduce ? 0 : 0.45, ease: "easeOut" }}
+          className="mx-auto max-w-2xl text-center"
         >
-          {/* Eyebrow */}
-          <div className="mb-5 inline-flex items-center gap-3">
-            <span className="h-px w-8 bg-brand-gold" />
-
-            <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-brand-navy">
-              Platform Features
-            </span>
-
-            <span className="h-px w-8 bg-brand-gold" />
-          </div>
-
-          {/* Heading */}
-          <h2 className="font-serif text-3xl font-medium leading-[1.12] tracking-tight text-brand-navy sm:text-4xl lg:text-[44px]">
-            Everything your institution needs,
-            <span className="block text-brand-blue">
-              connected in one platform.
-            </span>
+          <h2
+            id="features-heading"
+            className="text-3xl font-bold tracking-[-0.03em] text-brand-navy sm:text-4xl lg:text-5xl"
+          >
+            Everything Your Institution Needs
           </h2>
 
-          {/* Description */}
-          <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-slate-500 md:text-[15px]">
-            ITMT brings academic, student, administrative, financial, and
-            institutional operations together so everyone can work with
-            accurate information from one trusted system.
+          <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
+            Comprehensive management tools designed for the whole institution.
           </p>
         </motion.div>
 
-        {/* Feature grid */}
-        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:mt-14 lg:grid-cols-12">
-          {/* Featured academic management */}
-          <div className="lg:col-span-6">
-            <FeatureCard
-              icon={features[0].icon}
-              title={features[0].title}
-              description={features[0].description}
-              variant="featured"
-              number="01"
-            />
-          </div>
+        {/* Cards */}
+        <div className="mx-auto mt-12 grid max-w-6xl grid-cols-1 gap-6 sm:mt-14 md:grid-cols-2 lg:grid-cols-3 lg:gap-7">
+          {features.map((feature, index) => {
+            const Icon = feature.icon;
 
-          {/* Student management */}
-          <div className="lg:col-span-3">
-            <FeatureCard
-              icon={features[1].icon}
-              title={features[1].title}
-              description={features[1].description}
-              variant="compact"
-              number="02"
-            />
-          </div>
+            return (
+              <motion.article
+                key={feature.title}
+                initial={reduce ? false : { opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.15 }}
+                transition={{
+                  duration: reduce ? 0 : 0.45,
+                  delay: reduce ? 0 : (index % 3) * 0.06,
+                  ease: "easeOut",
+                }}
+                className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/70 border-t-[3px] border-t-brand-gold bg-white p-7 shadow-[0_2px_4px_rgba(15,23,42,0.03),0_14px_32px_-16px_rgba(15,23,42,0.14)] transition-all duration-300 hover:-translate-y-1 hover:border-t-brand-navy hover:shadow-[0_2px_4px_rgba(15,23,42,0.04),0_26px_48px_-20px_rgba(15,23,42,0.22)] sm:p-8"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-brand-navy/[0.06] text-brand-navy transition-colors duration-300 group-hover:bg-brand-navy group-hover:text-brand-gold">
+                  <Icon size={24} strokeWidth={1.8} aria-hidden="true" />
+                </div>
 
-          {/* Course registration */}
-          <div className="lg:col-span-3">
-            <FeatureCard
-              icon={features[2].icon}
-              title={features[2].title}
-              description={features[2].description}
-              variant="compact"
-              number="03"
-            />
-          </div>
+                <h3 className="mt-6 text-xl font-bold tracking-[-0.02em] text-brand-navy">
+                  {feature.title}
+                </h3>
 
-          {/* Results */}
-          <div className="lg:col-span-3">
-            <FeatureCard
-              icon={features[3].icon}
-              title={features[3].title}
-              description={features[3].description}
-              variant="light"
-              number="04"
-            />
-          </div>
-
-          {/* Finance */}
-          <div className="lg:col-span-3">
-            <FeatureCard
-              icon={features[4].icon}
-              title={features[4].title}
-              description={features[4].description}
-              variant="light"
-              number="05"
-            />
-          </div>
-
-          {/* Administration — wide */}
-          <div className="sm:col-span-2 lg:col-span-6">
-            <FeatureCard
-              icon={features[5].icon}
-              title={features[5].title}
-              description={features[5].description}
-              variant="institutional"
-              number="06"
-            />
-          </div>
+                <p className="mt-3 text-[15px] leading-7 text-slate-600">
+                  {feature.description}
+                </p>
+              </motion.article>
+            );
+          })}
         </div>
 
-        {/* Bottom statement */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{
-            duration: 0.5,
-            delay: 0.2,
-          }}
-          className="
-            mt-10
-            flex items-center justify-center gap-3
-            text-center
-          "
-        >
-          <span className="h-px w-10 bg-slate-200" />
+        {/* Closing */}
+        <div className="mt-12 flex flex-col items-center gap-5 text-center">
+          <p className="max-w-lg text-sm leading-7 text-slate-600">
+            One coordinated platform for the people, processes, and records that
+            keep your institution moving.
+          </p>
 
-          <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-slate-400">
-            Academic • Administrative • Institutional
-          </span>
-
-          <span className="h-px w-10 bg-slate-200" />
-        </motion.div>
+          <Link
+            href="/about"
+            className="group/cta inline-flex items-center gap-3 rounded-lg bg-brand-navy px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold focus-visible:ring-offset-2"
+          >
+            Learn more about ITMT
+            <ArrowRight
+              size={16}
+              aria-hidden="true"
+              className="transition-transform duration-200 group-hover/cta:translate-x-1"
+            />
+          </Link>
+        </div>
       </div>
     </section>
   );
 }
-

@@ -22,7 +22,7 @@ export default function HomePage() {
         <FeaturesSection />
         <PortalsSection />
         <HowItWorks />
-        <SecuritySection />
+        {/* <SecuritySection /> */}
         <CtaSection />
       </main>
 

@@ -7,98 +7,79 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { Card, CardContent } from "@/components/ui/card";
-
 const values = [
   {
-    number: "01",
     title: "Simplicity",
-    description:
-      "Technology should make institutional processes easier, not more complicated.",
+    description: "Technology should make institutional processes easier, not more complicated.",
     icon: Sparkles,
   },
   {
-    number: "02",
     title: "Reliability",
-    description:
-      "Academic and financial information must remain organized, accessible, and dependable.",
+    description: "Academic and financial information must remain organized, accessible, and dependable.",
     icon: ShieldCheck,
   },
   {
-    number: "03",
     title: "Security",
     description:
       "Access to institutional information should be controlled according to the responsibilities of each user.",
     icon: LockKeyhole,
   },
   {
-    number: "04",
     title: "Transparency",
-    description:
-      "Clear information helps students, staff, and administrators make better decisions.",
+    description: "Clear information helps students, staff, and administrators make better decisions.",
     icon: Accessibility,
   },
   {
-    number: "05",
     title: "Efficiency",
-    description:
-      "Reduce unnecessary manual processes and give people more time to focus on what matters.",
+    description: "Reduce unnecessary manual processes and give people more time to focus on what matters.",
     icon: Gauge,
   },
   {
-    number: "06",
     title: "Continuous Improvement",
-    description:
-      "Build a platform that can evolve alongside the institution.",
+    description: "Build a platform that can evolve alongside the institution.",
     icon: RefreshCw,
   },
 ];
 
 export default function AboutValues() {
   return (
-    <section className="bg-brand-light py-20 md:py-24 lg:py-32">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-gold">
-            Our Values
-          </p>
+    <section className="relative overflow-hidden bg-[#FAFAFA] py-20 sm:py-24 lg:py-28">
+      <div aria-hidden="true" className="pointer-events-none absolute -left-40 top-0 h-96 w-96 rounded-full bg-brand-gold/[0.08] blur-3xl" />
 
-          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-brand-navy sm:text-4xl">
-            Built around principles that matter.
-          </h2>
-        </div>
+      <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+        <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
+          <div className="lg:sticky lg:top-28 lg:self-start">
+            <h2 className="text-3xl font-bold leading-[1.1] tracking-[-0.03em] text-brand-navy sm:text-4xl lg:text-5xl">
+              Built around principles that matter.
+            </h2>
+            <p className="mt-5 max-w-md text-base leading-7 text-slate-600">
+              The values that guide how ITMT is designed, built and improved.
+            </p>
+            <div aria-hidden="true" className="mt-8 h-1 w-16 rounded-full bg-brand-gold" />
+          </div>
 
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {values.map((value) => {
-            const Icon = value.icon;
+          <ul className="grid gap-x-10 sm:grid-cols-2">
+            {values.map((value) => {
+              const Icon = value.icon;
 
-            return (
-              <Card
-                key={value.number}
-                className="group border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-brand-navy/20 hover:shadow-lg"
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-3xl font-semibold text-brand-navy/10">
-                      {value.number}
-                    </span>
-
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-light text-brand-navy transition-colors group-hover:bg-brand-navy group-hover:text-brand-gold">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                  </div>
-
-                  <h3 className="mt-6 text-lg font-semibold text-brand-navy">
+              return (
+                <li
+                  key={value.title}
+                  className="group border-t border-slate-200 py-8"
+                >
+                  <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-brand-navy shadow-sm ring-1 ring-slate-200 transition-all duration-300 group-hover:bg-brand-navy group-hover:text-brand-gold group-hover:ring-brand-navy">
+                    <Icon size={22} aria-hidden="true" />
+                  </span>
+                  <h3 className="mt-5 text-lg font-bold tracking-[-0.015em] text-brand-navy">
                     {value.title}
                   </h3>
-
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                  <p className="mt-2 text-[15px] leading-7 text-slate-600">
                     {value.description}
                   </p>
-                </CardContent>
-              </Card>
-            );
-          })}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </div>
     </section>

@@ -294,6 +294,13 @@ const navSections: NavSection[] = [
         icon: Archive,
         description: "Manage website hero",
       },
+        {
+      label: "Team Management",
+      href: "/dashboards/admin/team",
+      icon: Users,
+      description: "Manage website team profiles",
+    },
+    
     ],
   },
 ];
