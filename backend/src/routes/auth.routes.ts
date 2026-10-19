@@ -1,3 +1,4 @@
+
 import { Router } from "express";
 
 import {
@@ -5,28 +6,34 @@ import {
   getCurrentUser,
   login,
   loginRequest,
+  logout,
   oauthLogin,
-  register,
   resendVerification,
   resetPassword,
   studentLogin,
   verifyEmail,
 } from "../controllers/auth.controller.js";
+
 import { authenticate } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-// Public registration disabled — use the admissions application workflow instead
-// router.post("/register", register);
+// Email verification
 router.post("/verify-email", verifyEmail);
 router.post("/resend-verification", resendVerification);
+
+// Password recovery
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
+
+// Login
 router.post("/oauth-login", oauthLogin);
 router.post("/login-request", loginRequest);
 router.post("/login", login);
 router.post("/student/login", studentLogin);
 
+// Protected authentication routes
 router.get("/me", authenticate, getCurrentUser);
+router.post("/logout", authenticate, logout);
 
 export default router;

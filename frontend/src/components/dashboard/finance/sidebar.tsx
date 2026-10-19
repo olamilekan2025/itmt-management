@@ -3,42 +3,42 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
-
+import { useSession } from "next-auth/react";
 import {
-  AlertTriangle,
-  ArrowDownToLine,
-  BarChart3,
-  Banknote,
-  Bell,
-  BookOpen,
-  Calculator,
-  ChevronDown,
-  ChevronRight,
-  FileBarChart,
-  FileText,
-  History,
-  LayoutDashboard,
-  Loader2,
-  LogOut,
-  Megaphone,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Receipt,
-  Settings,
-  ShieldCheck,
-  Wallet,
-  X,
-} from "lucide-react";
-
-import {
+  useCallback,
   useEffect,
   useRef,
   useState,
   type ComponentType,
 } from "react";
 
+import {
+  ArrowDownToLine,
+  BarChart3,
+  Banknote,
+  BookOpen,
+  Calculator,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  FileBarChart,
+  FileText,
+  Globe2,
+  History,
+  LayoutDashboard,
+  LogOut,
+  Megaphone,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Receipt,
+  Settings,
+  Wallet,
+  X,
+} from "lucide-react";
+
 import { useFinanceDashboard } from "@/components/dashboard/finance/finance-dashboard-context";
+import { logoutUser } from "@/lib/auth/sign-out";
+import LogoutConfirmModal from "@/components/common/logout-confirm-modal";
 
 /* =========================================================
    TYPES
@@ -70,7 +70,6 @@ const navigation: NavSection[] = [
       },
     ],
   },
-
   {
     label: "Fee Management",
     items: [
@@ -91,7 +90,6 @@ const navigation: NavSection[] = [
       },
     ],
   },
-
   {
     label: "Payments",
     items: [
@@ -117,7 +115,6 @@ const navigation: NavSection[] = [
       },
     ],
   },
-
   {
     label: "Student Finance",
     items: [
@@ -128,7 +125,6 @@ const navigation: NavSection[] = [
       },
     ],
   },
-
   {
     label: "Reports",
     items: [
@@ -144,14 +140,13 @@ const navigation: NavSection[] = [
       },
     ],
   },
-
   {
     label: "System",
     items: [
       {
         label: "Notifications",
         href: "/dashboards/finance/notifications",
-        icon: Bell,
+        icon: Wallet,
       },
       {
         label: "Announcements",
@@ -168,7 +163,6 @@ const navigation: NavSection[] = [
 
 export default function FinanceSidebar() {
   const pathname = usePathname();
-
   const { data: session } = useSession();
 
   const {
@@ -189,171 +183,147 @@ export default function FinanceSidebar() {
   ======================================================= */
 
   const userName =
-    session?.user?.name?.trim() ||
-    "Finance Administrator";
+    session?.user?.name?.trim() || "Finance Administrator";
 
   const userEmail =
-    session?.user?.email?.trim() ||
-    "finance@itmt.edu.ng";
+    session?.user?.email?.trim() || "finance@itmt.edu.ng";
 
-  const userImage =
-    session?.user?.image || null;
+  const userImage = session?.user?.image || null;
 
   const initials =
     userName
       .split(" ")
       .filter(Boolean)
       .slice(0, 2)
-      .map((part) =>
-        part.charAt(0).toUpperCase(),
-      )
+      .map((part) => part.charAt(0).toUpperCase())
       .join("") || "FA";
 
   /* =======================================================
      ACTIVE NAVIGATION
   ======================================================= */
 
-  function isActive(href: string) {
-    if (href === "/dashboards/finance") {
-      return pathname === href;
-    }
+  const isActive = useCallback(
+    (href: string) => {
+      if (href === "/dashboards/finance") {
+        return pathname === href;
+      }
 
-    return (
-      pathname === href ||
-      pathname.startsWith(`${href}/`)
-    );
-  }
-
-  /* =======================================================
-     MOBILE NAVIGATION
-  ======================================================= */
-
-  function handleNavClick() {
-    setMobileOpen(false);
-    setProfileOpen(false);
-  }
-
-  function handleMobileClose() {
-    setMobileOpen(false);
-    setProfileOpen(false);
-  }
+      return pathname === href || pathname.startsWith(`${href}/`);
+    },
+    [pathname],
+  );
 
   /* =======================================================
-     PROFILE DROPDOWN
+     PROFILE AND LOGOUT
   ======================================================= */
 
-  function toggleProfile() {
+  const toggleProfile = () => {
     setProfileOpen((current) => !current);
-  }
+  };
+
+  const openLogoutModal = () => {
+    setProfileOpen(false);
+    setMobileOpen(false);
+    setLogoutModalOpen(true);
+  };
+
+  const closeLogoutModal = () => {
+    if (signingOut) return;
+    setLogoutModalOpen(false);
+  };
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+
+    setSigningOut(true);
+
+    try {
+      await logoutUser("/");
+    } catch (error) {
+      console.error("Finance sign-out error:", error);
+      setSigningOut(false);
+    }
+  };
 
   /* =======================================================
-     CLOSE PROFILE WHEN CLICKING OUTSIDE
+     NAVIGATION HANDLERS
+  ======================================================= */
+
+  const handleNavClick = () => {
+    setProfileOpen(false);
+    setMobileOpen(false);
+  };
+
+  const handleMobileClose = () => {
+    setMobileOpen(false);
+  };
+
+  /* =======================================================
+     CLOSE PROFILE MENU ON OUTSIDE CLICK
   ======================================================= */
 
   useEffect(() => {
-    function handleOutsideClick(event: MouseEvent) {
+    const handleOutsideClick = (event: MouseEvent) => {
       if (
         profileRef.current &&
-        !profileRef.current.contains(
-          event.target as Node,
-        )
+        !profileRef.current.contains(event.target as Node)
       ) {
         setProfileOpen(false);
       }
-    }
-
-    if (profileOpen) {
-      document.addEventListener(
-        "mousedown",
-        handleOutsideClick,
-      );
-    }
-
-    return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleOutsideClick,
-      );
     };
-  }, [profileOpen]);
 
-  /* =======================================================
-     ESCAPE HANDLER
-  ======================================================= */
-
-  useEffect(() => {
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-
-      setProfileOpen(false);
-      setLogoutModalOpen(false);
-    }
-
-    document.addEventListener(
-      "keydown",
-      handleEscape,
-    );
+    document.addEventListener("mousedown", handleOutsideClick);
 
     return () => {
-      document.removeEventListener(
-        "keydown",
-        handleEscape,
-      );
+      document.removeEventListener("mousedown", handleOutsideClick);
     };
   }, []);
 
   /* =======================================================
-     LOCK BODY SCROLL ON MOBILE
+     ESCAPE KEY
+  ======================================================= */
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+
+      setProfileOpen(false);
+
+      if (mobileOpen) {
+        setMobileOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [mobileOpen, setMobileOpen]);
+
+  /* =======================================================
+     MOBILE BODY SCROLL LOCK
   ======================================================= */
 
   useEffect(() => {
     if (!mobileOpen) return;
 
-    const originalOverflow =
-      document.body.style.overflow;
-
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     return () => {
-      document.body.style.overflow =
-        originalOverflow;
+      document.body.style.overflow = previousOverflow;
     };
   }, [mobileOpen]);
 
   /* =======================================================
-     LOGOUT
+     CLOSE MOBILE SIDEBAR AFTER ROUTE CHANGE
   ======================================================= */
 
-  function openLogoutModal() {
+  useEffect(() => {
+    setMobileOpen(false);
     setProfileOpen(false);
-    setLogoutModalOpen(true);
-  }
-
-  function closeLogoutModal() {
-    if (signingOut) return;
-
-    setLogoutModalOpen(false);
-  }
-
-  async function handleSignOut() {
-    if (signingOut) return;
-
-    try {
-      setSigningOut(true);
-
-      await signOut({
-        callbackUrl: "/auth/login",
-      });
-    } catch (error) {
-      console.error(
-        "Sign out error:",
-        error,
-      );
-
-      setSigningOut(false);
-      setLogoutModalOpen(false);
-    }
-  }
+  }, [pathname, setMobileOpen]);
 
   /* =======================================================
      RENDER
@@ -361,367 +331,99 @@ export default function FinanceSidebar() {
 
   return (
     <>
-      {/* =====================================================
-          MOBILE BACKDROP
-      ====================================================== */}
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation menu"
+          onClick={handleMobileClose}
+          className="fixed inset-0 z-[80] bg-brand-dark/60 backdrop-blur-[2px] lg:hidden"
+        />
+      )}
 
-      <div
-        onClick={handleMobileClose}
-        aria-hidden="true"
-        className={`
-          fixed
-          inset-0
-          z-40
-          bg-slate-950/60
-          backdrop-blur-sm
-          transition-opacity
-          duration-300
-          md:hidden
-          ${
-            mobileOpen
-              ? "opacity-100"
-              : "pointer-events-none opacity-0"
-          }
-        `}
-      />
-
-      {/* =====================================================
-          SIDEBAR
-      ====================================================== */}
-
+      {/* Sidebar */}
       <aside
         className={`
-          fixed
-          inset-y-0
-          left-0
-          z-50
-          flex
-          flex-col
-          border-r
-          border-white/[0.07]
-          bg-brand-navy
-          text-white
-          shadow-[8px_0_30px_rgba(0,0,0,0.08)]
-
-          transition-all
-          duration-300
-          ease-in-out
-
-          ${
-            collapsed
-              ? "w-[88px]"
-              : "w-72"
-          }
-
+          fixed inset-y-0 left-0 z-[90]
+          flex h-dvh flex-col
+          border-r border-white/[0.06]
+          bg-brand-dark text-white
+          shadow-[12px_0_50px_rgba(0,0,0,0.12)]
+          transition-[width,transform] duration-300 ease-in-out
+          ${collapsed ? "w-[88px]" : "w-72"}
           ${
             mobileOpen
               ? "translate-x-0"
-              : "-translate-x-full md:translate-x-0"
+              : "-translate-x-full lg:translate-x-0"
           }
         `}
       >
-        {/* ===================================================
-            MOBILE CLOSE BUTTON
-        ==================================================== */}
+        {/* =====================================================
+            BRAND / LOGO
+        ====================================================== */}
 
-        <button
-          type="button"
-          onClick={handleMobileClose}
-          aria-label="Close menu"
-          className="
-            absolute
-            right-3
-            top-3
-            z-30
-            flex
-            h-8
-            w-8
-            items-center
-            justify-center
-            rounded-lg
-            text-white/50
-            transition
-            hover:bg-white/[0.08]
-            hover:text-white
-            md:hidden
-          "
-        >
-          <X className="h-4 w-4" />
-        </button>
-
-        {/* ===================================================
-            PREMIUM BRAND / LOGO CONTROL
-        ==================================================== */}
-
-        <div
-          className={`
-            relative
-            shrink-0
-            pt-5
-            transition-all
-            duration-300
-
-            ${
-              collapsed
-                ? "px-3"
-                : "px-5"
+        <div className="shrink-0 border-b border-white/[0.06] px-3 pb-4 pt-5">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={
+              collapsed ? "Expand finance sidebar" : "Collapse finance sidebar"
             }
-          `}
-        >
-          <div
-            className="
-              group/logo-control
-              relative
-              overflow-hidden
-              rounded-2xl
-              border
-              border-white/[0.08]
-              bg-gradient-to-br
-              from-white/[0.09]
-              via-white/[0.045]
-              to-white/[0.015]
-              shadow-[0_12px_40px_rgba(0,0,0,0.12)]
-              transition-all
-              duration-300
-              hover:border-brand-gold/25
-              hover:shadow-[0_16px_50px_rgba(0,0,0,0.20)]
-            "
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className={`
+              group/logo flex w-full items-center gap-3 rounded-2xl
+              p-2 text-left transition-colors
+              hover:bg-white/[0.045]
+              ${collapsed ? "justify-center" : ""}
+            `}
           >
-            {/* Decorative glow */}
+            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-[0_8px_24px_rgba(0,0,0,0.18)] ring-1 ring-white/20 transition-all duration-300 group-hover/logo:scale-[1.04]">
+              <Image
+                src="/newLogo.png"
+                alt="ITMT logo"
+                fill
+                sizes="48px"
+                priority
+                className="object-contain p-1.5 transition-all duration-300 group-hover/logo:scale-75 group-hover/logo:opacity-0"
+              />
 
-            <div
-              className="
-                pointer-events-none
-                absolute
-                -right-10
-                -top-10
-                h-28
-                w-28
-                rounded-full
-                bg-brand-gold/10
-                blur-3xl
-                transition-all
-                duration-500
-                group-hover/logo-control:bg-brand-gold/20
-              "
-            />
+              <span className="absolute inset-0 flex scale-75 items-center justify-center bg-brand-gold text-brand-navy opacity-0 transition-all duration-300 group-hover/logo:scale-100 group-hover/logo:opacity-100">
+                {collapsed ? (
+                  <PanelLeftOpen className="h-5 w-5" strokeWidth={2.2} />
+                ) : (
+                  <PanelLeftClose className="h-5 w-5" strokeWidth={2.2} />
+                )}
+              </span>
+            </div>
 
-            <div
-              className="
-                pointer-events-none
-                absolute
-                -bottom-10
-                -left-10
-                h-20
-                w-20
-                rounded-full
-                bg-blue-400/5
-                blur-2xl
-              "
-            />
-
-            {/* =================================================
-                LOGO = COLLAPSE / EXPAND CONTROL
-            ================================================== */}
-
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              aria-label={
-                collapsed
-                  ? "Expand sidebar"
-                  : "Collapse sidebar"
-              }
-              title={
-                collapsed
-                  ? "Expand sidebar"
-                  : "Collapse sidebar"
-              }
-              className={`
-                group/logo
-                relative
-                z-10
-                flex
-                w-full
-                items-center
-                rounded-xl
-                outline-none
-                transition-all
-                duration-300
-                focus-visible:ring-2
-                focus-visible:ring-brand-gold/50
-
-                ${
-                  collapsed
-                    ? "justify-center p-3"
-                    : "justify-start gap-3 p-1"
-                }
-              `}
-            >
-              {/* =================================================
-                  LOGO / HOVER ICON
-              ================================================== */}
-
-              <div
-                className="
-                  relative
-                  flex
-                  h-12
-                  w-12
-                  shrink-0
-                  items-center
-                  justify-center
-                  overflow-hidden
-                  rounded-xl
-                  bg-white
-                  shadow-[0_8px_24px_rgba(0,0,0,0.18)]
-                  ring-1
-                  ring-white/20
-                  transition-all
-                  duration-300
-                  group-hover/logo:scale-[1.04]
-                  group-hover/logo:shadow-[0_10px_30px_rgba(0,0,0,0.25)]
-                "
-              >
-                {/* Original logo */}
-
-                <Image
-                  src="/newLogo.png"
-                  alt="ITMT logo"
-                  fill
-                  sizes="48px"
-                  priority
-                  className="
-                    object-contain
-                    p-1.5
-                    transition-all
-                    duration-300
-                    ease-out
-                    group-hover/logo:scale-75
-                    group-hover/logo:opacity-0
-                  "
-                />
-
-                {/* Collapse / Expand icon */}
-
-                <span
-                  className="
-                    absolute
-                    inset-0
-                    flex
-                    items-center
-                    justify-center
-                    bg-brand-gold
-                    text-brand-navy
-                    opacity-0
-                    scale-75
-                    transition-all
-                    duration-300
-                    ease-out
-                    group-hover/logo:scale-100
-                    group-hover/logo:opacity-100
-                  "
-                >
-                  {collapsed ? (
-                    <PanelLeftOpen
-                      className="
-                        h-5
-                        w-5
-                        transition-transform
-                        duration-300
-                        group-hover/logo:scale-110
-                      "
-                      strokeWidth={2.2}
-                    />
-                  ) : (
-                    <PanelLeftClose
-                      className="
-                        h-5
-                        w-5
-                        transition-transform
-                        duration-300
-                        group-hover/logo:scale-110
-                      "
-                      strokeWidth={2.2}
-                    />
-                  )}
-                </span>
-              </div>
-
-              {/* =================================================
-                  PORTAL NAME
-              ================================================== */}
-
-              <div
-                className={`
-                  min-w-0
-                  overflow-hidden
-                  text-left
-                  transition-all
-                  duration-300
-
-                  ${
-                    collapsed
-                      ? "w-0 -translate-x-2 opacity-0"
-                      : "w-auto translate-x-0 opacity-100"
-                  }
-                `}
-              >
+            {!collapsed && (
+              <div className="min-w-0 flex-1 overflow-hidden">
                 <p className="whitespace-nowrap text-sm font-bold tracking-tight text-white">
                   ITMT
                 </p>
-
                 <p className="mt-0.5 whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.16em] text-white/40">
                   Finance Portal
                 </p>
               </div>
-            </button>
+            )}
+          </button>
 
-            {/* =================================================
-                ONLINE STATUS
-            ================================================== */}
+          {/* Online status */}
+          <div
+            className={`mt-4 flex items-center gap-2 pb-1 ${
+              collapsed ? "justify-center" : ""
+            }`}
+          >
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            </span>
 
-            <div
-              className={`
-                relative
-                flex
-                items-center
-                gap-2
-                transition-all
-                duration-300
-
-                ${
-                  collapsed
-                    ? "mt-3 justify-center pb-3"
-                    : "mt-4 pb-1"
-                }
-              `}
-            >
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
-
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-              </span>
-
-              <span
-                className={`
-                  whitespace-nowrap
-                  text-[10px]
-                  font-medium
-                  text-white/45
-                  transition-all
-                  duration-300
-
-                  ${
-                    collapsed
-                      ? "hidden"
-                      : ""
-                  }
-                `}
-              >
+            {!collapsed && (
+              <span className="whitespace-nowrap text-[10px] font-medium text-white/45">
                 Finance system online
               </span>
-            </div>
+            )}
           </div>
         </div>
 
@@ -729,39 +431,15 @@ export default function FinanceSidebar() {
             NAVIGATION
         ====================================================== */}
 
-        <nav
-          className="
-            mt-5
-            flex-1
-            overflow-y-auto
-            px-3
-            pb-4
-            scrollbar-thin
-            scrollbar-track-transparent
-            scrollbar-thumb-white/10
-          "
-        >
+        <nav className="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 mt-5 flex-1 overflow-y-auto px-3 pb-4">
           <div className="space-y-6">
             {navigation.map((section) => (
               <div key={section.label}>
                 {/* Section heading */}
-
                 <div
-                  className={`
-                    mb-2
-                    flex
-                    items-center
-                    gap-2
-                    px-3
-                    transition-all
-                    duration-300
-
-                    ${
-                      collapsed
-                        ? "justify-center gap-0 px-0"
-                        : ""
-                    }
-                  `}
+                  className={`mb-2 flex items-center gap-2 px-3 ${
+                    collapsed ? "justify-center px-0" : ""
+                  }`}
                 >
                   {collapsed ? (
                     <span className="mx-auto block h-px w-8 bg-white/[0.08]" />
@@ -770,56 +448,29 @@ export default function FinanceSidebar() {
                       <span className="whitespace-nowrap text-[9px] font-bold uppercase tracking-[0.2em] text-white/30">
                         {section.label}
                       </span>
-
                       <div className="h-px flex-1 bg-white/[0.05]" />
                     </>
                   )}
                 </div>
 
                 {/* Section items */}
-
                 <div className="space-y-1">
                   {section.items.map((item) => {
                     const Icon = item.icon;
-                    const active = isActive(
-                      item.href,
-                    );
+                    const active = isActive(item.href);
 
                     return (
                       <Link
-                        key={`${section.label}-${item.href}-${item.label}`}
+                        key={`${section.label}-${item.label}`}
                         href={item.href}
                         onClick={handleNavClick}
-                        aria-current={
-                          active
-                            ? "page"
-                            : undefined
-                        }
-                        title={
-                          collapsed
-                            ? item.label
-                            : undefined
-                        }
+                        aria-current={active ? "page" : undefined}
+                        title={collapsed ? item.label : undefined}
                         className={`
-                          group
-                          relative
-                          flex
-                          w-full
-                          items-center
-                          gap-3
-                          rounded-xl
-                          px-3
-                          py-2.5
-                          text-left
-                          transition-all
-                          duration-200
-
-                          ${
-                            collapsed
-                              ? "justify-center px-2"
-                              : ""
-                          }
-
+                          group relative flex w-full items-center gap-3
+                          rounded-xl px-3 py-2.5 text-left
+                          transition-all duration-200
+                          ${collapsed ? "justify-center px-2" : ""}
                           ${
                             active
                               ? "bg-white/[0.08]"
@@ -828,39 +479,19 @@ export default function FinanceSidebar() {
                         `}
                       >
                         {/* Active indicator */}
-
                         <span
                           className={`
-                            absolute
-                            left-0
-                            h-6
-                            w-[2px]
-                            rounded-r-full
-                            bg-brand-gold
-                            transition-opacity
-
-                            ${
-                              active
-                                ? "opacity-100"
-                                : "opacity-0"
-                            }
+                            absolute left-0 h-6 w-[2px] rounded-r-full
+                            bg-brand-gold transition-opacity
+                            ${active ? "opacity-100" : "opacity-0"}
                           `}
                         />
 
                         {/* Icon */}
-
                         <span
                           className={`
-                            flex
-                            h-8
-                            w-8
-                            shrink-0
-                            items-center
-                            justify-center
-                            rounded-lg
-                            transition-all
-                            duration-200
-
+                            flex h-8 w-8 shrink-0 items-center justify-center
+                            rounded-lg transition-all duration-200
                             ${
                               active
                                 ? "bg-brand-gold/20 text-brand-gold"
@@ -872,52 +503,34 @@ export default function FinanceSidebar() {
                         </span>
 
                         {/* Label */}
-
-                        <span
-                          className={`
-                            min-w-0
-                            flex-1
-                            truncate
-                            text-[13px]
-                            font-medium
-                            transition-all
-                            duration-300
-
-                            ${
-                              collapsed
-                                ? "w-0 opacity-0"
-                                : "w-auto opacity-100"
-                            }
-
-                            ${
-                              active
-                                ? "text-white"
-                                : "text-white/65 group-hover:text-white"
-                            }
-                          `}
-                        >
-                          {item.label}
-                        </span>
+                        {!collapsed && (
+                          <span
+                            className={`
+                              min-w-0 flex-1 truncate text-[13px] font-medium
+                              ${
+                                active
+                                  ? "text-white"
+                                  : "text-white/65 group-hover:text-white"
+                              }
+                            `}
+                          >
+                            {item.label}
+                          </span>
+                        )}
 
                         {/* Chevron */}
-
-                        <ChevronRight
-                          className={`
-                            h-3.5
-                            w-3.5
-                            shrink-0
-                            transition-all
-                            duration-200
-
-                            ${
-                              collapsed
-                                ? "hidden"
-                                : active
+                        {!collapsed && (
+                          <ChevronRight
+                            className={`
+                              h-3.5 w-3.5 shrink-0 transition-all duration-200
+                              ${
+                                active
                                   ? "translate-x-0.5 text-brand-gold/50"
                                   : "text-white/0 group-hover:translate-x-0.5 group-hover:text-white/25"
-                            }
-                          `}
-                        />
+                              }
+                            `}
+                          />
+                        )}
                       </Link>
                     );
                   })}
@@ -934,77 +547,27 @@ export default function FinanceSidebar() {
         <div
           ref={profileRef}
           className={`
-            relative
-            border-t
-            border-white/[0.07]
-            transition-all
-            duration-300
-
-            ${
-              collapsed
-                ? "p-3"
-                : "p-4"
-            }
+            relative shrink-0 border-t border-white/[0.07]
+            transition-all duration-300
+            ${collapsed ? "p-3" : "p-4"}
           `}
         >
-          {/* ===================================================
-              PROFILE BUTTON
-          ==================================================== */}
-
+          {/* Profile button */}
           <button
             type="button"
             onClick={toggleProfile}
             aria-expanded={profileOpen}
             aria-haspopup="menu"
             className={`
-              group
-              flex
-              w-full
-              items-center
-              gap-3
-              rounded-2xl
-              border
-              border-white/[0.07]
-              bg-white/[0.035]
-              p-2.5
-              text-left
-              transition-all
-              duration-200
-              hover:border-brand-gold/20
-              hover:bg-white/[0.07]
-
-              ${
-                collapsed
-                  ? "justify-center p-2"
-                  : ""
-              }
+              group flex w-full items-center gap-3 rounded-2xl
+              border border-white/[0.07] bg-white/[0.035]
+              p-2.5 text-left transition-all duration-200
+              hover:border-brand-gold/20 hover:bg-white/[0.07]
+              ${collapsed ? "justify-center p-2" : ""}
             `}
           >
             {/* Avatar */}
-
-            <div
-              className="
-                relative
-                flex
-                h-10
-                w-10
-                shrink-0
-                items-center
-                justify-center
-                overflow-hidden
-                rounded-xl
-                bg-gradient-to-br
-                from-brand-gold
-                to-brand-gold/70
-                text-xs
-                font-bold
-                text-brand-navy
-                shadow-lg
-                shadow-brand-gold/10
-                ring-1
-                ring-brand-gold/20
-              "
-            >
+            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-brand-gold text-xs font-bold text-brand-navy shadow-lg shadow-brand-gold/10 ring-1 ring-brand-gold/20">
               {userImage ? (
                 <Image
                   src={userImage}
@@ -1017,129 +580,44 @@ export default function FinanceSidebar() {
                 initials
               )}
 
-              {/* Online indicator */}
+              <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border-2 border-brand-dark bg-emerald-400" />
+            </div>
 
-              <span
-                className="
-                  absolute
-                  bottom-0.5
-                  right-0.5
-                  h-2.5
-                  w-2.5
-                  rounded-full
-                  border-2
-                  border-brand-navy
-                  bg-emerald-400
-                "
+            {!collapsed && (
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <p className="truncate text-xs font-semibold text-white">
+                  {userName}
+                </p>
+                <p className="mt-0.5 truncate text-[10px] text-white/35">
+                  {userEmail}
+                </p>
+              </div>
+            )}
+
+            {!collapsed && (
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-white/30 transition-transform duration-200 ${
+                  profileOpen ? "rotate-180 text-brand-gold" : ""
+                }`}
               />
-            </div>
-
-            {/* User information */}
-
-            <div
-              className={`
-                min-w-0
-                flex-1
-                overflow-hidden
-                transition-all
-                duration-300
-
-                ${
-                  collapsed
-                    ? "hidden"
-                    : ""
-                }
-              `}
-            >
-              <p className="truncate text-xs font-semibold text-white">
-                {userName}
-              </p>
-
-              <p className="mt-0.5 truncate text-[10px] text-white/35">
-                {userEmail}
-              </p>
-            </div>
-
-            {/* Chevron */}
-
-            <ChevronDown
-              className={`
-                h-4
-                w-4
-                shrink-0
-                text-white/30
-                transition-transform
-                duration-200
-
-                ${
-                  profileOpen
-                    ? "rotate-180 text-brand-gold"
-                    : ""
-                }
-
-                ${
-                  collapsed
-                    ? "hidden"
-                    : ""
-                }
-              `}
-            />
+            )}
           </button>
 
-          {/* ===================================================
-              PROFILE DROPDOWN
-          ==================================================== */}
-
+          {/* Profile dropdown */}
           {profileOpen && (
             <div
               role="menu"
               className={`
-                absolute
-                bottom-full
-                mb-3
-                overflow-hidden
-                rounded-2xl
-                border
-                border-white/[0.09]
-                bg-[#081a35]
-                shadow-2xl
-                shadow-black/30
-                backdrop-blur-xl
-                animate-in
-                fade-in
-                slide-in-from-bottom-2
-                duration-200
-
-                ${
-                  collapsed
-                    ? "left-[76px] right-auto w-64"
-                    : "left-3 right-3"
-                }
+                absolute bottom-full z-[100] mb-3 overflow-hidden
+                rounded-2xl border border-white/[0.09]
+                bg-[#081a35] shadow-2xl shadow-black/30
+                ${collapsed ? "left-[76px] w-64" : "left-3 right-3"}
               `}
             >
-              {/* Profile header */}
-
+              {/* Profile identity */}
               <div className="border-b border-white/[0.07] bg-white/[0.025] p-4">
                 <div className="flex items-center gap-3">
-                  <div
-                    className="
-                      relative
-                      flex
-                      h-11
-                      w-11
-                      shrink-0
-                      items-center
-                      justify-center
-                      overflow-hidden
-                      rounded-xl
-                      bg-gradient-to-br
-                      from-brand-gold
-                      to-brand-gold/70
-                      text-sm
-                      font-bold
-                      text-brand-navy
-                    "
-                  >
+                  <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-brand-gold text-sm font-bold text-brand-navy">
                     {userImage ? (
                       <Image
                         src={userImage}
@@ -1157,7 +635,6 @@ export default function FinanceSidebar() {
                     <p className="truncate text-sm font-semibold text-white">
                       {userName}
                     </p>
-
                     <p className="mt-0.5 truncate text-[10px] text-white/40">
                       {userEmail}
                     </p>
@@ -1166,53 +643,44 @@ export default function FinanceSidebar() {
 
                 <div className="mt-3 flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-
                   <span className="text-[10px] font-medium text-emerald-300/80">
                     Finance account active
                   </span>
                 </div>
               </div>
 
-              {/* Menu items */}
-
               <div className="p-2">
-                {/* Settings */}
+                {/* Back to website */}
+                <Link
+                  href="/"
+                  onClick={handleNavClick}
+                  role="menuitem"
+                  className="group flex items-center gap-3 rounded-xl px-3 py-3 transition hover:bg-white/[0.06]"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-white/50 transition group-hover:bg-brand-gold/10 group-hover:text-brand-gold">
+                    <Globe2 className="h-4 w-4" />
+                  </span>
 
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-white/80 group-hover:text-white">
+                      Back to Website
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-white/30">
+                      Visit the public website
+                    </p>
+                  </div>
+
+                  <ExternalLink className="h-3.5 w-3.5 text-white/20 transition group-hover:text-brand-gold" />
+                </Link>
+
+                {/* Settings */}
                 <Link
                   href="/dashboards/finance/settings"
-                  onClick={() => {
-                    setProfileOpen(false);
-                    setMobileOpen(false);
-                  }}
+                  onClick={handleNavClick}
                   role="menuitem"
-                  className="
-                    group
-                    flex
-                    items-center
-                    gap-3
-                    rounded-xl
-                    px-3
-                    py-3
-                    transition
-                    hover:bg-white/[0.06]
-                  "
+                  className="group flex items-center gap-3 rounded-xl px-3 py-3 transition hover:bg-white/[0.06]"
                 >
-                  <span
-                    className="
-                      flex
-                      h-9
-                      w-9
-                      shrink-0
-                      items-center
-                      justify-center
-                      rounded-lg
-                      bg-white/[0.05]
-                      text-white/50
-                      transition
-                      group-hover:bg-brand-gold/10
-                      group-hover:text-brand-gold
-                    "
-                  >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-white/50 transition group-hover:bg-brand-gold/10 group-hover:text-brand-gold">
                     <Settings className="h-4 w-4" />
                   </span>
 
@@ -1220,7 +688,6 @@ export default function FinanceSidebar() {
                     <p className="text-xs font-semibold text-white/80 group-hover:text-white">
                       Settings
                     </p>
-
                     <p className="mt-0.5 text-[10px] text-white/30">
                       Manage your account
                     </p>
@@ -1229,42 +696,16 @@ export default function FinanceSidebar() {
                   <ChevronRight className="h-3.5 w-3.5 text-white/20 transition group-hover:translate-x-0.5 group-hover:text-brand-gold" />
                 </Link>
 
-                {/* Sign out */}
+                <div className="my-2 border-t border-white/[0.06]" />
 
+                {/* Sign out */}
                 <button
                   type="button"
                   onClick={openLogoutModal}
                   role="menuitem"
-                  className="
-                    group
-                    flex
-                    w-full
-                    items-center
-                    gap-3
-                    rounded-xl
-                    px-3
-                    py-3
-                    text-left
-                    transition
-                    hover:bg-red-500/[0.08]
-                  "
+                  className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-red-500/[0.08]"
                 >
-                  <span
-                    className="
-                      flex
-                      h-9
-                      w-9
-                      shrink-0
-                      items-center
-                      justify-center
-                      rounded-lg
-                      bg-white/[0.05]
-                      text-white/50
-                      transition
-                      group-hover:bg-red-500/10
-                      group-hover:text-red-300
-                    "
-                  >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-white/50 transition group-hover:bg-red-500/10 group-hover:text-red-300">
                     <LogOut className="h-4 w-4" />
                   </span>
 
@@ -1272,7 +713,6 @@ export default function FinanceSidebar() {
                     <p className="text-xs font-semibold text-white/80 group-hover:text-white">
                       Sign out
                     </p>
-
                     <p className="mt-0.5 text-[10px] text-white/30">
                       End your finance session
                     </p>
@@ -1280,8 +720,7 @@ export default function FinanceSidebar() {
                 </button>
               </div>
 
-              {/* Footer */}
-
+              {/* Dropdown footer */}
               <div className="border-t border-white/[0.06] px-4 py-2.5">
                 <p className="text-center text-[9px] uppercase tracking-[0.16em] text-white/20">
                   ITMT Finance Portal
@@ -1290,52 +729,27 @@ export default function FinanceSidebar() {
             </div>
           )}
 
-          {/* Footer label */}
-
-          <p
-            className={`
-              mt-3
-              text-center
-              text-[9px]
-              tracking-wide
-              text-white/20
-              transition-all
-              duration-300
-
-              ${
-                collapsed
-                  ? "hidden"
-                  : ""
-              }
-            `}
-          >
-            ITMT MANAGEMENT SYSTEM • FINANCE
-          </p>
+          {!collapsed && (
+            <p className="mt-3 text-center text-[9px] tracking-wide text-white/20">
+              ITMT MANAGEMENT SYSTEM • FINANCE
+            </p>
+          )}
         </div>
       </aside>
 
-      {/* =======================================================
+      {/* =====================================================
           FLOATING MOBILE CLOSE BUTTON
-          Outside the sidebar
-      ======================================================== */}
+      ====================================================== */}
 
       <div
-       className={`
-          pointer-events-none
-          fixed
-          left-85
-          top-150
-          z-[100]
-          -translate-x-1/2
-          lg:hidden
-          transition-all
-          duration-300
-          ease-out
-
+        className={`
+          fixed left-[calc(min(18rem,100vw-3rem))] top-1/2 z-[95]
+          -translate-x-1/2 -translate-y-1/2
+          transition-all duration-300 lg:hidden
           ${
             mobileOpen
-              ? "translate-y-0 opacity-100"
-              : "-translate-y-5 opacity-0"
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none opacity-0"
           }
         `}
       >
@@ -1343,332 +757,22 @@ export default function FinanceSidebar() {
           type="button"
           onClick={handleMobileClose}
           aria-label="Close finance sidebar"
-          className="
-            pointer-events-auto
-            flex
-            h-10
-            w-10
-            -translate-x-1/2
-            items-center
-            justify-center
-            rounded-full
-            border
-            border-white/10
-            bg-brand-navy
-            text-white/70
-            shadow-[0_12px_35px_rgba(0,0,0,0.30)]
-            transition-all
-            duration-200
-            hover:scale-105
-            hover:border-brand-gold/30
-            hover:bg-brand-gold
-            hover:text-brand-navy
-          "
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-brand-navy text-white/70 shadow-[0_12px_35px_rgba(0,0,0,0.30)] transition hover:border-brand-gold/30 hover:bg-brand-gold hover:text-brand-navy"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* =======================================================
-          PREMIUM LOGOUT CONFIRMATION MODAL
-      ======================================================== */}
+      {/* =====================================================
+          SHARED LOGOUT CONFIRMATION MODAL
+      ====================================================== */}
 
-      {logoutModalOpen && (
-        <div
-          className="
-            fixed
-            inset-0
-            z-[200]
-            flex
-            items-center
-            justify-center
-            bg-slate-950/70
-            p-4
-            backdrop-blur-md
-            animate-in
-            fade-in
-            duration-200
-          "
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="logout-title"
-          aria-describedby="logout-description"
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              closeLogoutModal();
-            }
-          }}
-        >
-          <div
-            className="
-              relative
-              w-full
-              max-w-md
-              overflow-hidden
-              rounded-3xl
-              border
-              border-white/10
-              bg-brand-navy
-              shadow-[0_30px_100px_rgba(0,0,0,0.45)]
-              animate-in
-              zoom-in-95
-              slide-in-from-bottom-3
-              duration-300
-            "
-          >
-            {/* Decorative glow */}
-
-            <div
-              className="
-                pointer-events-none
-                absolute
-                -right-20
-                -top-20
-                h-48
-                w-48
-                rounded-full
-                bg-red-500/10
-                blur-3xl
-              "
-            />
-
-            <div
-              className="
-                pointer-events-none
-                absolute
-                -bottom-20
-                -left-20
-                h-40
-                w-40
-                rounded-full
-                bg-brand-gold/5
-                blur-3xl
-              "
-            />
-
-            {/* Close */}
-
-            <button
-              type="button"
-              onClick={closeLogoutModal}
-              disabled={signingOut}
-              aria-label="Close logout dialog"
-              className="
-                absolute
-                right-4
-                top-4
-                z-10
-                flex
-                h-9
-                w-9
-                items-center
-                justify-center
-                rounded-xl
-                text-white/35
-                transition
-                hover:bg-white/[0.06]
-                hover:text-white
-                disabled:cursor-not-allowed
-              "
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            <div className="relative p-6 sm:p-7">
-              {/* Icon */}
-
-              <div
-                className="
-                  mb-5
-                  flex
-                  h-14
-                  w-14
-                  items-center
-                  justify-center
-                  rounded-2xl
-                  border
-                  border-red-400/20
-                  bg-red-400/10
-                  text-red-300
-                  shadow-lg
-                  shadow-red-950/20
-                "
-              >
-                <AlertTriangle className="h-6 w-6" />
-              </div>
-
-              {/* Heading */}
-
-              <div>
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-brand-gold">
-                  Finance Portal
-                </p>
-
-                <h2
-                  id="logout-title"
-                  className="
-                    text-xl
-                    font-bold
-                    tracking-tight
-                    text-white
-                    sm:text-2xl
-                  "
-                >
-                  Are you sure you want to sign out?
-                </h2>
-
-                <p
-                  id="logout-description"
-                  className="
-                    mt-3
-                    text-sm
-                    leading-6
-                    text-white/50
-                  "
-                >
-                  You are about to leave your
-                  finance account. Your current
-                  session will be securely ended.
-                </p>
-              </div>
-
-              {/* User preview */}
-
-              <div
-                className="
-                  mt-6
-                  flex
-                  items-center
-                  gap-3
-                  rounded-2xl
-                  border
-                  border-white/[0.07]
-                  bg-white/[0.035]
-                  p-3
-                "
-              >
-                <div
-                  className="
-                    relative
-                    flex
-                    h-10
-                    w-10
-                    shrink-0
-                    items-center
-                    justify-center
-                    overflow-hidden
-                    rounded-xl
-                    bg-gradient-to-br
-                    from-brand-gold
-                    to-brand-gold/70
-                    text-xs
-                    font-bold
-                    text-brand-navy
-                  "
-                >
-                  {userImage ? (
-                    <Image
-                      src={userImage}
-                      alt={userName}
-                      fill
-                      sizes="40px"
-                      className="object-cover"
-                    />
-                  ) : (
-                    initials
-                  )}
-                </div>
-
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold text-white">
-                    {userName}
-                  </p>
-
-                  <p className="truncate text-[10px] text-white/35">
-                    {userEmail}
-                  </p>
-                </div>
-
-                <ShieldCheck className="ml-auto h-4 w-4 shrink-0 text-emerald-400/70" />
-              </div>
-
-              {/* Buttons */}
-
-              <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                {/* Cancel */}
-
-                <button
-                  type="button"
-                  onClick={closeLogoutModal}
-                  disabled={signingOut}
-                  className="
-                    h-11
-                    rounded-xl
-                    border
-                    border-white/[0.08]
-                    bg-white/[0.04]
-                    px-5
-                    text-sm
-                    font-semibold
-                    text-white/70
-                    transition
-                    hover:bg-white/[0.08]
-                    hover:text-white
-                    disabled:cursor-not-allowed
-                    disabled:opacity-50
-                    sm:min-w-[110px]
-                  "
-                >
-                  Cancel
-                </button>
-
-                {/* Confirm logout */}
-
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={signingOut}
-                  className="
-                    flex
-                    h-11
-                    items-center
-                    justify-center
-                    gap-2
-                    rounded-xl
-                    bg-red-500
-                    px-5
-                    text-sm
-                    font-semibold
-                    text-white
-                    shadow-lg
-                    shadow-red-950/20
-                    transition
-                    hover:bg-red-400
-                    disabled:cursor-not-allowed
-                    disabled:opacity-60
-                    sm:min-w-[145px]
-                  "
-                >
-                  {signingOut ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Signing out...
-                    </>
-                  ) : (
-                    <>
-                      <LogOut className="h-4 w-4" />
-                      Yes, sign out
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <LogoutConfirmModal
+        isOpen={logoutModalOpen}
+        isLoading={signingOut}
+        onClose={closeLogoutModal}
+        onConfirm={handleSignOut}
+      />
     </>
   );
 }

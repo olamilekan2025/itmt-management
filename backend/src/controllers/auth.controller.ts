@@ -1,3 +1,4 @@
+
 import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -20,7 +21,7 @@ import {
 
 /**
  * =========================================================
- * SCHEMAS
+ * VALIDATION SCHEMAS
  * =========================================================
  */
 
@@ -71,7 +72,8 @@ const loginWithOtpSchema = loginSchema.extend({
   otp: z
     .string()
     .trim()
-    .length(6, "OTP must be 6 digits"),
+    .length(6, "OTP must be 6 digits")
+    .regex(/^\d{6}$/, "OTP must contain only digits"),
 });
 
 const verifyEmailSchema = z.object({
@@ -79,11 +81,9 @@ const verifyEmailSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .email(),
+    .email("Enter a valid email address"),
 
-  token: z
-    .string()
-    .min(10),
+  token: z.string().min(10, "Invalid verification token"),
 });
 
 const resendVerificationSchema = z.object({
@@ -91,7 +91,7 @@ const resendVerificationSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .email(),
+    .email("Enter a valid email address"),
 });
 
 const forgotPasswordSchema = z.object({
@@ -99,7 +99,7 @@ const forgotPasswordSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .email(),
+    .email("Enter a valid email address"),
 });
 
 const resetPasswordSchema = z.object({
@@ -107,18 +107,13 @@ const resetPasswordSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .email(),
+    .email("Enter a valid email address"),
 
-  token: z
-    .string()
-    .min(10),
+  token: z.string().min(10, "Invalid reset token"),
 
   password: z
     .string()
-    .min(
-      8,
-      "Password must be at least 8 characters",
-    )
+    .min(8, "Password must be at least 8 characters")
     .max(100, "Password is too long"),
 });
 
@@ -127,18 +122,43 @@ const oauthLoginSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .email(),
+    .email("Enter a valid email address"),
 
   name: z
     .string()
     .trim()
-    .min(1),
+    .min(1, "Name is required")
+    .max(100, "Name is too long"),
 
-  provider: z.enum([
-    "google",
-    "facebook",
-  ]),
+  provider: z.enum(["google", "facebook"]),
 });
+
+/**
+ * =========================================================
+ * ACCOUNT STATUS
+ * =========================================================
+ */
+
+function checkAccountStatus(user: {
+  isActive: boolean;
+  isSuspended: boolean;
+}): { allowed: true } | { allowed: false; message: string } {
+  if (!user.isActive) {
+    return {
+      allowed: false,
+      message: "This account has been deactivated",
+    };
+  }
+
+  if (user.isSuspended) {
+    return {
+      allowed: false,
+      message: "This account has been suspended",
+    };
+  }
+
+  return { allowed: true };
+}
 
 /**
  * =========================================================
@@ -149,19 +169,19 @@ const oauthLoginSchema = z.object({
 function createToken(
   userId: string,
   role: string,
-) {
+  tokenVersion = 0,
+): string {
   const secret = process.env.JWT_SECRET;
 
   if (!secret) {
-    throw new Error(
-      "JWT_SECRET is not defined",
-    );
+    throw new Error("JWT_SECRET is not defined");
   }
 
   return jwt.sign(
     {
       userId,
       role,
+      tokenVersion,
     },
     secret,
     {
@@ -175,49 +195,36 @@ function createToken(
  * REGISTER
  * =========================================================
  *
- * NOTE:
  * Public registration creates a student account.
+ * Existing students with matric numbers should use the
+ * institution-provided account and student login flow.
  *
- * Students who already have a matric number should NOT
- * use this endpoint. They should use the existing-student
- * account flow handled by the admin.
+ * Keep this controller unregistered as a public route if
+ * public registration is disabled in your application.
  */
 
-export async function register(
-  req: Request,
-  res: Response,
-) {
+export async function register(req: Request, res: Response) {
   try {
-    const data =
-      registerSchema.parse(req.body);
+    const data = registerSchema.parse(req.body);
+    const normalizedEmail = data.email.toLowerCase().trim();
 
-    const normalizedEmail =
-      data.email.trim().toLowerCase();
-
-    const existingUser =
-      await User.findOne({
-        email: normalizedEmail,
-      });
+    const existingUser = await User.findOne({
+      email: normalizedEmail,
+    });
 
     if (existingUser) {
       return res.status(409).json({
         success: false,
-        message:
-          "An account with this email already exists",
+        message: "An account with this email already exists",
       });
     }
 
-    const hashedPassword =
-      await bcrypt.hash(
-        data.password,
-        12,
-      );
+    const hashedPassword = await bcrypt.hash(data.password, 12);
 
     const {
       token: verificationToken,
       hash: verificationHash,
-    } =
-      generateVerificationToken();
+    } = generateVerificationToken();
 
     const user = await User.create({
       name: data.name,
@@ -225,30 +232,24 @@ export async function register(
       password: hashedPassword,
       role: "student",
       isEmailVerified: false,
-      emailVerificationTokenHash:
-        verificationHash,
-      emailVerificationExpires:
-        new Date(
-          Date.now() +
-            24 * 60 * 60 * 1000,
-        ),
+      emailVerificationTokenHash: verificationHash,
+      emailVerificationExpires: new Date(
+        Date.now() + 24 * 60 * 60 * 1000,
+      ),
       isActive: true,
+      isSuspended: false,
+      tokenVersion: 0,
     });
 
-    const frontendUrl =
-      process.env.FRONTEND_URL;
+    const frontendUrl = process.env.FRONTEND_URL;
 
     if (!frontendUrl) {
-      console.error(
-        "FRONTEND_URL is not defined",
-      );
+      console.error("FRONTEND_URL is not defined");
     } else {
       const verifyLink =
         `${frontendUrl}/auth/verify-email` +
-        `?token=${verificationToken}` +
-        `&email=${encodeURIComponent(
-          user.email,
-        )}`;
+        `?token=${encodeURIComponent(verificationToken)}` +
+        `&email=${encodeURIComponent(user.email)}`;
 
       try {
         await sendVerificationEmail(
@@ -268,7 +269,6 @@ export async function register(
       success: true,
       message:
         "Account created. Please check your email to verify your address before logging in.",
-
       user: {
         id: user._id,
         name: user.name,
@@ -281,8 +281,7 @@ export async function register(
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors:
-          error.flatten().fieldErrors,
+        errors: error.flatten().fieldErrors,
       });
     }
 
@@ -290,25 +289,19 @@ export async function register(
       typeof error === "object" &&
       error !== null &&
       "code" in error &&
-      (error as { code?: number }).code ===
-        11000
+      (error as { code?: number }).code === 11000
     ) {
       return res.status(409).json({
         success: false,
-        message:
-          "An account with this email already exists",
+        message: "An account with this email already exists",
       });
     }
 
-    console.error(
-      "Registration error:",
-      error,
-    );
+    console.error("Registration error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to create account",
+      message: "Unable to create account",
     });
   }
 }
@@ -319,22 +312,15 @@ export async function register(
  * =========================================================
  */
 
-export async function verifyEmail(
-  req: Request,
-  res: Response,
-) {
+export async function verifyEmail(req: Request, res: Response) {
   try {
-    const data =
-      verifyEmailSchema.parse(req.body);
+    const data = verifyEmailSchema.parse(req.body);
 
-    const user =
-      await User.findOne({
-        email: data.email
-          .toLowerCase()
-          .trim(),
-      }).select(
-        "+emailVerificationTokenHash +emailVerificationExpires",
-      );
+    const user = await User.findOne({
+      email: data.email.toLowerCase().trim(),
+    }).select(
+      "+emailVerificationTokenHash +emailVerificationExpires",
+    );
 
     if (
       !user ||
@@ -343,23 +329,18 @@ export async function verifyEmail(
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid or expired verification link",
+        message: "Invalid or expired verification link",
       });
     }
 
     if (user.isEmailVerified) {
       return res.status(200).json({
         success: true,
-        message:
-          "Email already verified",
+        message: "Email already verified",
       });
     }
 
-    if (
-      user.emailVerificationExpires <
-      new Date()
-    ) {
+    if (user.emailVerificationExpires < new Date()) {
       return res.status(400).json({
         success: false,
         message:
@@ -367,49 +348,37 @@ export async function verifyEmail(
       });
     }
 
-    if (
-      hashToken(data.token) !==
-      user.emailVerificationTokenHash
-    ) {
+    if (hashToken(data.token) !== user.emailVerificationTokenHash) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid verification link",
+        message: "Invalid verification link",
       });
     }
 
     user.isEmailVerified = true;
-    user.emailVerificationTokenHash =
-      undefined;
-    user.emailVerificationExpires =
-      undefined;
+    user.emailVerificationTokenHash = undefined;
+    user.emailVerificationExpires = undefined;
 
     await user.save();
 
     return res.status(200).json({
       success: true,
-      message:
-        "Email verified successfully. You can now log in.",
+      message: "Email verified successfully. You can now log in.",
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors:
-          error.flatten().fieldErrors,
+        errors: error.flatten().fieldErrors,
       });
     }
 
-    console.error(
-      "Verify email error:",
-      error,
-    );
+    console.error("Verify email error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to verify email",
+      message: "Unable to verify email",
     });
   }
 }
@@ -425,10 +394,7 @@ export async function resendVerification(
   res: Response,
 ) {
   try {
-    const data =
-      resendVerificationSchema.parse(
-        req.body,
-      );
+    const data = resendVerificationSchema.parse(req.body);
 
     const genericResponse = {
       success: true,
@@ -436,49 +402,33 @@ export async function resendVerification(
         "If an unverified account exists with that email, a new verification link has been sent.",
     };
 
-    const user =
-      await User.findOne({
-        email: data.email
-          .toLowerCase()
-          .trim(),
-      });
+    const user = await User.findOne({
+      email: data.email.toLowerCase().trim(),
+    });
 
-    if (
-      !user ||
-      user.isEmailVerified
-    ) {
-      return res
-        .status(200)
-        .json(genericResponse);
+    if (!user || user.isEmailVerified) {
+      return res.status(200).json(genericResponse);
     }
 
     const {
       token: verificationToken,
       hash: verificationHash,
-    } =
-      generateVerificationToken();
+    } = generateVerificationToken();
 
-    user.emailVerificationTokenHash =
-      verificationHash;
-
-    user.emailVerificationExpires =
-      new Date(
-        Date.now() +
-          24 * 60 * 60 * 1000,
-      );
+    user.emailVerificationTokenHash = verificationHash;
+    user.emailVerificationExpires = new Date(
+      Date.now() + 24 * 60 * 60 * 1000,
+    );
 
     await user.save();
 
-    const frontendUrl =
-      process.env.FRONTEND_URL;
+    const frontendUrl = process.env.FRONTEND_URL;
 
     if (frontendUrl) {
       const verifyLink =
         `${frontendUrl}/auth/verify-email` +
-        `?token=${verificationToken}` +
-        `&email=${encodeURIComponent(
-          user.email,
-        )}`;
+        `?token=${encodeURIComponent(verificationToken)}` +
+        `&email=${encodeURIComponent(user.email)}`;
 
       try {
         await sendVerificationEmail(
@@ -494,28 +444,21 @@ export async function resendVerification(
       }
     }
 
-    return res
-      .status(200)
-      .json(genericResponse);
+    return res.status(200).json(genericResponse);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors:
-          error.flatten().fieldErrors,
+        errors: error.flatten().fieldErrors,
       });
     }
 
-    console.error(
-      "Resend verification error:",
-      error,
-    );
+    console.error("Resend verification error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to resend verification email",
+      message: "Unable to resend verification email",
     });
   }
 }
@@ -526,15 +469,9 @@ export async function resendVerification(
  * =========================================================
  */
 
-export async function forgotPassword(
-  req: Request,
-  res: Response,
-) {
+export async function forgotPassword(req: Request, res: Response) {
   try {
-    const data =
-      forgotPasswordSchema.parse(
-        req.body,
-      );
+    const data = forgotPasswordSchema.parse(req.body);
 
     const genericResponse = {
       success: true,
@@ -542,46 +479,33 @@ export async function forgotPassword(
         "If an account exists with that email, a password reset link has been sent.",
     };
 
-    const user =
-      await User.findOne({
-        email: data.email
-          .toLowerCase()
-          .trim(),
-      });
+    const user = await User.findOne({
+      email: data.email.toLowerCase().trim(),
+    });
 
     if (!user) {
-      return res
-        .status(200)
-        .json(genericResponse);
+      return res.status(200).json(genericResponse);
     }
 
     const {
       token: resetToken,
       hash: resetHash,
-    } =
-      generateVerificationToken();
+    } = generateVerificationToken();
 
-    user.passwordResetTokenHash =
-      resetHash;
-
-    user.passwordResetExpires =
-      new Date(
-        Date.now() +
-          60 * 60 * 1000,
-      );
+    user.passwordResetTokenHash = resetHash;
+    user.passwordResetExpires = new Date(
+      Date.now() + 60 * 60 * 1000,
+    );
 
     await user.save();
 
-    const frontendUrl =
-      process.env.FRONTEND_URL;
+    const frontendUrl = process.env.FRONTEND_URL;
 
     if (frontendUrl) {
       const resetLink =
         `${frontendUrl}/auth/reset-password` +
-        `?token=${resetToken}` +
-        `&email=${encodeURIComponent(
-          user.email,
-        )}`;
+        `?token=${encodeURIComponent(resetToken)}` +
+        `&email=${encodeURIComponent(user.email)}`;
 
       try {
         await sendPasswordResetEmail(
@@ -597,28 +521,21 @@ export async function forgotPassword(
       }
     }
 
-    return res
-      .status(200)
-      .json(genericResponse);
+    return res.status(200).json(genericResponse);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors:
-          error.flatten().fieldErrors,
+        errors: error.flatten().fieldErrors,
       });
     }
 
-    console.error(
-      "Forgot password error:",
-      error,
-    );
+    console.error("Forgot password error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to process request",
+      message: "Unable to process request",
     });
   }
 }
@@ -627,26 +544,19 @@ export async function forgotPassword(
  * =========================================================
  * RESET PASSWORD
  * =========================================================
+ *
+ * Incrementing tokenVersion invalidates existing JWTs.
  */
 
-export async function resetPassword(
-  req: Request,
-  res: Response,
-) {
+export async function resetPassword(req: Request, res: Response) {
   try {
-    const data =
-      resetPasswordSchema.parse(
-        req.body,
-      );
+    const data = resetPasswordSchema.parse(req.body);
 
-    const user =
-      await User.findOne({
-        email: data.email
-          .toLowerCase()
-          .trim(),
-      }).select(
-        "+passwordResetTokenHash +passwordResetExpires",
-      );
+    const user = await User.findOne({
+      email: data.email.toLowerCase().trim(),
+    }).select(
+      "+passwordResetTokenHash +passwordResetExpires",
+    );
 
     if (
       !user ||
@@ -655,15 +565,11 @@ export async function resetPassword(
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid or expired reset link",
+        message: "Invalid or expired reset link",
       });
     }
 
-    if (
-      user.passwordResetExpires <
-      new Date()
-    ) {
+    if (user.passwordResetExpires < new Date()) {
       return res.status(400).json({
         success: false,
         message:
@@ -671,28 +577,23 @@ export async function resetPassword(
       });
     }
 
-    if (
-      hashToken(data.token) !==
-      user.passwordResetTokenHash
-    ) {
+    if (hashToken(data.token) !== user.passwordResetTokenHash) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid reset link",
+        message: "Invalid reset link",
       });
     }
 
-    user.password =
-      await bcrypt.hash(
-        data.password,
-        12,
-      );
+    user.password = await bcrypt.hash(data.password, 12);
+    user.passwordResetTokenHash = undefined;
+    user.passwordResetExpires = undefined;
 
-    user.passwordResetTokenHash =
-      undefined;
+    // Invalidate all previously issued JWTs.
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
 
-    user.passwordResetExpires =
-      undefined;
+    // Clear any pending login OTP as an additional precaution.
+    user.otpHash = undefined;
+    user.otpExpires = undefined;
 
     await user.save();
 
@@ -706,20 +607,15 @@ export async function resetPassword(
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors:
-          error.flatten().fieldErrors,
+        errors: error.flatten().fieldErrors,
       });
     }
 
-    console.error(
-      "Reset password error:",
-      error,
-    );
+    console.error("Reset password error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to reset password",
+      message: "Unable to reset password",
     });
   }
 }
@@ -728,27 +624,22 @@ export async function resetPassword(
  * =========================================================
  * OAUTH LOGIN
  * =========================================================
+ *
+ * SECURITY NOTE:
+ * This endpoint assumes the frontend has already verified
+ * the OAuth identity with the provider. Do not trust an
+ * email/name sent by the browser alone in production.
  */
 
-export async function oauthLogin(
-  req: Request,
-  res: Response,
-) {
+export async function oauthLogin(req: Request, res: Response) {
   try {
-    const data =
-      oauthLoginSchema.parse(
-        req.body,
-      );
+    const data = oauthLoginSchema.parse(req.body);
 
-    const normalizedEmail =
-      data.email
-        .trim()
-        .toLowerCase();
+    const normalizedEmail = data.email.toLowerCase().trim();
 
-    let user =
-      await User.findOne({
-        email: normalizedEmail,
-      });
+    let user = await User.findOne({
+      email: normalizedEmail,
+    });
 
     if (!user) {
       user = await User.create({
@@ -757,33 +648,35 @@ export async function oauthLogin(
         role: "student",
         isEmailVerified: true,
         isActive: true,
+        isSuspended: false,
+        tokenVersion: 0,
       });
     }
 
-    if (!user.isActive) {
+    const accountStatus = checkAccountStatus(user);
+
+    if (!accountStatus.allowed) {
       return res.status(403).json({
         success: false,
-        message:
-          "This account has been deactivated",
+        message: accountStatus.message,
       });
     }
 
     const token = createToken(
       user._id.toString(),
       user.role,
+      user.tokenVersion ?? 0,
     );
 
     return res.status(200).json({
       success: true,
       token,
-
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
-        matricNumber:
-          user.matricNumber,
+        matricNumber: user.matricNumber,
       },
     });
   } catch (error) {
@@ -791,20 +684,15 @@ export async function oauthLogin(
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors:
-          error.flatten().fieldErrors,
+        errors: error.flatten().fieldErrors,
       });
     }
 
-    console.error(
-      "OAuth login error:",
-      error,
-    );
+    console.error("OAuth login error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to complete social sign-in",
+      message: "Unable to complete social sign-in",
     });
   }
 }
@@ -815,52 +703,35 @@ export async function oauthLogin(
  * =========================================================
  *
  * Staff:
- * email + password
- *       ↓
- * OTP
- *       ↓
- * login
+ * email + password -> OTP -> login
  *
- * Students should use studentLogin().
+ * Students must use studentLogin().
  */
 
-export async function loginRequest(
-  req: Request,
-  res: Response,
-) {
+export async function loginRequest(req: Request, res: Response) {
   try {
-    const data =
-      loginSchema.parse(req.body);
+    const data = loginSchema.parse(req.body);
 
-    const user =
-      await User.findOne({
-        email: data.email
-          .toLowerCase()
-          .trim(),
-      }).select("+password");
+    const user = await User.findOne({
+      email: data.email.toLowerCase().trim(),
+    }).select("+password");
 
-    if (
-      !user ||
-      !user.password
-    ) {
+    if (!user || !user.password) {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid email or password",
+        message: "Invalid email or password",
       });
     }
 
-    if (!user.isActive) {
+    const accountStatus = checkAccountStatus(user);
+
+    if (!accountStatus.allowed) {
       return res.status(403).json({
         success: false,
-        message:
-          "This account has been deactivated",
+        message: accountStatus.message,
       });
     }
 
-    /**
-     * Students should not use the staff login.
-     */
     if (user.role === "student") {
       return res.status(403).json({
         success: false,
@@ -869,50 +740,32 @@ export async function loginRequest(
       });
     }
 
-    const passwordMatches =
-      await bcrypt.compare(
-        data.password,
-        user.password,
-      );
+    const passwordMatches = await bcrypt.compare(
+      data.password,
+      user.password,
+    );
 
     if (!passwordMatches) {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid email or password",
+        message: "Invalid email or password",
       });
     }
 
-    const {
-      otp,
-      hash: otpHash,
-    } = generateOtp();
+    const { otp, hash: otpHash } = generateOtp();
 
     user.otpHash = otpHash;
-
-    user.otpExpires =
-      new Date(
-        Date.now() +
-          10 * 60 * 1000,
-      );
+    user.otpExpires = new Date(
+      Date.now() + 10 * 60 * 1000,
+    );
 
     await user.save();
 
     try {
-      await sendOtpEmail(
-        user.email,
-        user.name,
-        otp,
-      );
+      await sendOtpEmail(user.email, user.name, otp);
     } catch (emailError) {
-      console.error(
-        "Failed to send OTP email:",
-        emailError,
-      );
+      console.error("Failed to send OTP email:", emailError);
 
-      /**
-       * Remove generated OTP if delivery failed.
-       */
       user.otpHash = undefined;
       user.otpExpires = undefined;
 
@@ -928,28 +781,22 @@ export async function loginRequest(
     return res.status(200).json({
       success: true,
       requiresOtp: true,
-      message:
-        "A one-time code has been sent to your email",
+      message: "A one-time code has been sent to your email",
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors:
-          error.flatten().fieldErrors,
+        errors: error.flatten().fieldErrors,
       });
     }
 
-    console.error(
-      "Login request error:",
-      error,
-    );
+    console.error("Login request error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to process login request",
+      message: "Unable to process login request",
     });
   }
 }
@@ -960,47 +807,30 @@ export async function loginRequest(
  * =========================================================
  */
 
-export async function login(
-  req: Request,
-  res: Response,
-) {
+export async function login(req: Request, res: Response) {
   try {
-    const data =
-      loginWithOtpSchema.parse(
-        req.body,
-      );
+    const data = loginWithOtpSchema.parse(req.body);
 
-    const user =
-      await User.findOne({
-        email: data.email
-          .toLowerCase()
-          .trim(),
-      }).select(
-        "+password +otpHash +otpExpires",
-      );
+    const user = await User.findOne({
+      email: data.email.toLowerCase().trim(),
+    }).select("+password +otpHash +otpExpires");
 
-    if (
-      !user ||
-      !user.password
-    ) {
+    if (!user || !user.password) {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid email or password",
+        message: "Invalid email or password",
       });
     }
 
-    if (!user.isActive) {
+    const accountStatus = checkAccountStatus(user);
+
+    if (!accountStatus.allowed) {
       return res.status(403).json({
         success: false,
-        message:
-          "This account has been deactivated",
+        message: accountStatus.message,
       });
     }
 
-    /**
-     * Students must use matric-number login.
-     */
     if (user.role === "student") {
       return res.status(403).json({
         success: false,
@@ -1009,17 +839,15 @@ export async function login(
       });
     }
 
-    const passwordMatches =
-      await bcrypt.compare(
-        data.password,
-        user.password,
-      );
+    const passwordMatches = await bcrypt.compare(
+      data.password,
+      user.password,
+    );
 
     if (!passwordMatches) {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid email or password",
+        message: "Invalid email or password",
       });
     }
 
@@ -1030,27 +858,18 @@ export async function login(
     ) {
       return res.status(401).json({
         success: false,
-        message:
-          "OTP has expired. Please request a new one.",
+        message: "OTP has expired. Please request a new one.",
       });
     }
 
-    const providedOtpHash = hashToken(data.otp);
-
-    if (
-      providedOtpHash !==
-      user.otpHash
-    ) {
+    if (hashToken(data.otp) !== user.otpHash) {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid OTP",
+        message: "Invalid OTP",
       });
     }
 
-    /**
-     * OTP is one-time-use.
-     */
+    // OTP is one-time-use.
     user.otpHash = undefined;
     user.otpExpires = undefined;
 
@@ -1059,13 +878,13 @@ export async function login(
     const token = createToken(
       user._id.toString(),
       user.role,
+      user.tokenVersion ?? 0,
     );
 
     return res.status(200).json({
       success: true,
       message: "Login successful",
       token,
-
       user: {
         id: user._id,
         name: user.name,
@@ -1078,15 +897,11 @@ export async function login(
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors:
-          error.flatten().fieldErrors,
+        errors: error.flatten().fieldErrors,
       });
     }
 
-    console.error(
-      "Login error:",
-      error,
-    );
+    console.error("Login error:", error);
 
     return res.status(500).json({
       success: false,
@@ -1101,94 +916,72 @@ export async function login(
  * =========================================================
  *
  * Students:
- *
- * matric number + password
- *          ↓
- * direct login
- *
- * No email OTP is required here because the student's
- * identity/account is established by the institution.
+ * matric number + password -> direct login
  */
 
-export async function studentLogin(
-  req: Request,
-  res: Response,
-) {
+export async function studentLogin(req: Request, res: Response) {
   try {
-    const data =
-      studentLoginSchema.parse(
-        req.body,
-      );
+    const data = studentLoginSchema.parse(req.body);
 
-    const normalizedMatricNumber =
-      data.matricNumber
-        .trim()
-        .toUpperCase();
+    const normalizedMatricNumber = data.matricNumber
+      .trim()
+      .toUpperCase();
 
-    const user =
-      await User.findOne({
-        matricNumber:
-          normalizedMatricNumber,
-      }).select("+password");
+    const user = await User.findOne({
+      matricNumber: normalizedMatricNumber,
+    }).select("+password");
 
-    if (
-      !user ||
-      !user.password
-    ) {
+    if (!user || !user.password) {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid matric number or password",
+        message: "Invalid matric number or password",
       });
     }
 
     if (user.role !== "student") {
       return res.status(403).json({
         success: false,
-        message:
-          "This account is not a student account",
+        message: "This account is not a student account",
       });
     }
 
-    if (!user.isActive) {
+    const accountStatus = checkAccountStatus(user);
+
+    if (!accountStatus.allowed) {
       return res.status(403).json({
         success: false,
-        message:
-          "This account has been deactivated",
+        message: accountStatus.message,
       });
     }
 
-    const passwordMatches =
-      await bcrypt.compare(
-        data.password,
-        user.password,
-      );
+    const passwordMatches = await bcrypt.compare(
+      data.password,
+      user.password,
+    );
 
     if (!passwordMatches) {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid matric number or password",
+        message: "Invalid matric number or password",
       });
     }
 
     const token = createToken(
       user._id.toString(),
       user.role,
+      user.tokenVersion ?? 0,
     );
 
     return res.status(200).json({
       success: true,
       message: "Login successful",
       token,
-
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
-        matricNumber:
-          user.matricNumber,
+        matricNumber: user.matricNumber,
       },
     });
   } catch (error) {
@@ -1196,20 +989,15 @@ export async function studentLogin(
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors:
-          error.flatten().fieldErrors,
+        errors: error.flatten().fieldErrors,
       });
     }
 
-    console.error(
-      "Student login error:",
-      error,
-    );
+    console.error("Student login error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to log in",
+      message: "Unable to log in",
     });
   }
 }
@@ -1228,32 +1016,21 @@ export async function getCurrentUser(
     if (!req.user?.userId) {
       return res.status(401).json({
         success: false,
-        message:
-          "Authentication required",
+        message: "Authentication required",
       });
     }
 
-    const user =
-      await User.findById(
-        req.user.userId,
+    const user = await User.findById(req.user.userId)
+      .select(
+        "name email role isActive isSuspended createdAt matricNumber programme academicSession level isEmailVerified",
       )
-        .select(
-          "name email role isActive createdAt matricNumber programme academicSession level isEmailVerified",
-        )
-        .populate(
-          "programme",
-          "name code",
-        )
-        .populate(
-          "academicSession",
-          "name",
-        );
+      .populate("programme", "name code")
+      .populate("academicSession", "name");
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message:
-          "User not found",
+        message: "User not found",
       });
     }
 
@@ -1262,15 +1039,69 @@ export async function getCurrentUser(
       user,
     });
   } catch (error) {
-    console.error(
-      "Get current user error:",
-      error,
-    );
+    console.error("Get current user error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to retrieve user",
+      message: "Unable to retrieve user",
+    });
+  }
+}
+
+/**
+ * =========================================================
+ * LOGOUT
+ * =========================================================
+ *
+ * POST /api/auth/logout
+ *
+ * The route must use authenticate middleware before logout.
+ * Incrementing tokenVersion invalidates the user's previously
+ * issued JWTs on all devices, not just the current browser.
+ */
+
+export async function logout(
+  req: AuthRequest,
+  res: Response,
+) {
+  try {
+    if (!req.user?.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.userId,
+      {
+        $inc: {
+          tokenVersion: 1,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      },
+    );
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    console.error("Logout error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to log out",
     });
   }
 }

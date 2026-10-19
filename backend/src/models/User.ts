@@ -1,3 +1,4 @@
+
 import mongoose, {
   Document,
   Schema,
@@ -12,27 +13,17 @@ export type UserRole =
   | "student";
 
 export interface IUser extends Document {
-  /* =====================================================
-     BASIC INFORMATION
-  ===================================================== */
-
+  // Basic information
   name: string;
   email: string;
   password?: string;
-
   phone?: string;
   profileImage?: string;
 
-  /* =====================================================
-     ROLE
-  ===================================================== */
-
+  // Role
   role: UserRole;
 
-  /* =====================================================
-     NOTIFICATION PREFERENCES
-  ===================================================== */
-
+  // Notification preferences
   notificationPreferences?: {
     emailNotifications?: boolean;
     academicUpdates?: boolean;
@@ -40,56 +31,36 @@ export interface IUser extends Document {
     paymentNotifications?: boolean;
   };
 
-  /* =====================================================
-     APPEARANCE PREFERENCES
-  ===================================================== */
-
+  // Appearance preferences
   appearancePreferences?: {
     theme?: "system" | "light" | "dark";
   };
 
-  /* =====================================================
-     STAFF INFORMATION
-  ===================================================== */
-
+  // Staff information
   staffNumber?: string;
   qualification?: string;
 
-  /* =====================================================
-     STUDENT ACADEMIC INFORMATION
-  ===================================================== */
-
+  // Student academic information
   programme?: Types.ObjectId;
   academicSession?: Types.ObjectId;
   matricNumber?: string;
   level?: string;
 
-  /* =====================================================
-     ACCOUNT STATUS
-  ===================================================== */
-
+  // Account status
   isActive: boolean;
   isSuspended: boolean;
   isEmailVerified: boolean;
+  tokenVersion: number;
 
-  /* =====================================================
-     EMAIL VERIFICATION
-  ===================================================== */
-
+  // Email verification
   emailVerificationTokenHash?: string;
   emailVerificationExpires?: Date;
 
-  /* =====================================================
-     OTP
-  ===================================================== */
-
+  // OTP
   otpHash?: string;
   otpExpires?: Date;
 
-  /* =====================================================
-     PASSWORD RESET
-  ===================================================== */
-
+  // Password reset
   passwordResetTokenHash?: string;
   passwordResetExpires?: Date;
 
@@ -99,10 +70,7 @@ export interface IUser extends Document {
 
 const userSchema = new Schema<IUser>(
   {
-    /* =====================================================
-       BASIC INFORMATION
-    ===================================================== */
-
+    // Basic information
     name: {
       type: String,
       required: true,
@@ -135,10 +103,7 @@ const userSchema = new Schema<IUser>(
       maxlength: 500,
     },
 
-    /* =====================================================
-       ROLE
-    ===================================================== */
-
+    // Role
     role: {
       type: String,
       enum: [
@@ -152,10 +117,7 @@ const userSchema = new Schema<IUser>(
       required: true,
     },
 
-    /* =====================================================
-       NOTIFICATION PREFERENCES
-    ===================================================== */
-
+    // Notification preferences
     notificationPreferences: {
       emailNotifications: {
         type: Boolean,
@@ -175,10 +137,7 @@ const userSchema = new Schema<IUser>(
       },
     },
 
-    /* =====================================================
-       APPEARANCE PREFERENCES
-    ===================================================== */
-
+    // Appearance preferences
     appearancePreferences: {
       theme: {
         type: String,
@@ -187,10 +146,7 @@ const userSchema = new Schema<IUser>(
       },
     },
 
-    /* =====================================================
-       STAFF INFORMATION
-    ===================================================== */
-
+    // Staff information
     staffNumber: {
       type: String,
       trim: true,
@@ -206,10 +162,7 @@ const userSchema = new Schema<IUser>(
       maxlength: 150,
     },
 
-    /* =====================================================
-       STUDENT ACADEMIC INFORMATION
-    ===================================================== */
-
+    // Student academic information
     programme: {
       type: Schema.Types.ObjectId,
       ref: "Programme",
@@ -233,10 +186,7 @@ const userSchema = new Schema<IUser>(
       trim: true,
     },
 
-    /* =====================================================
-       ACCOUNT STATUS
-    ===================================================== */
-
+    // Account status
     isActive: {
       type: Boolean,
       default: true,
@@ -255,10 +205,13 @@ const userSchema = new Schema<IUser>(
       required: true,
     },
 
-    /* =====================================================
-       EMAIL VERIFICATION
-    ===================================================== */
+    tokenVersion: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
 
+    // Email verification
     emailVerificationTokenHash: {
       type: String,
       select: false,
@@ -269,10 +222,7 @@ const userSchema = new Schema<IUser>(
       select: false,
     },
 
-    /* =====================================================
-       OTP
-    ===================================================== */
-
+    // OTP
     otpHash: {
       type: String,
       select: false,
@@ -283,10 +233,7 @@ const userSchema = new Schema<IUser>(
       select: false,
     },
 
-    /* =====================================================
-       PASSWORD RESET
-    ===================================================== */
-
+    // Password reset
     passwordResetTokenHash: {
       type: String,
       select: false,
@@ -302,10 +249,7 @@ const userSchema = new Schema<IUser>(
   },
 );
 
-/* =========================================================
-   INDEXES
-========================================================= */
-
+// Indexes
 userSchema.index({
   role: 1,
   isActive: 1,
@@ -316,10 +260,7 @@ userSchema.index({
   createdAt: -1,
 });
 
-/* =========================================================
-   MODEL
-========================================================= */
-
+// Model
 const User =
   mongoose.models.User ||
   mongoose.model<IUser>("User", userSchema);
