@@ -12,6 +12,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import AuthAwareLink from "@/components/shared/auth-aware-link";
+
 interface Portal {
   title: string;
   description: string;
@@ -19,6 +21,7 @@ interface Portal {
   href: string;
   icon: LucideIcon;
   prominent?: boolean;
+  isStudent?: boolean;
 }
 
 const portals: Portal[] = [
@@ -29,6 +32,7 @@ const portals: Portal[] = [
     buttonText: "Student login",
     href: "/auth/student/login",
     icon: GraduationCap,
+    isStudent: true,
   },
   {
     title: "Lecturer Portal",
@@ -78,7 +82,7 @@ export default function PortalsSection() {
       <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-8">
         {/* Header */}
         <motion.div
-          initial={reduce ? false : { opacity: 0, y: 12 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={{ duration: reduce ? 0 : 0.45, ease: "easeOut" }}
@@ -106,7 +110,7 @@ export default function PortalsSection() {
             return (
               <motion.article
                 key={portal.title}
-                initial={reduce ? false : { opacity: 0, y: 12 }}
+                initial={false}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.15 }}
                 transition={{
@@ -152,8 +156,10 @@ export default function PortalsSection() {
                 </div>
 
                 <div className="relative mt-auto pt-8">
-                  <Link
-                    href={portal.href}
+                  <AuthAwareLink
+                    fallbackHref={portal.href}
+                    studentHref={portal.isStudent ? portal.href : "/auth/student/login"}
+                    studentLogin={portal.isStudent}
                     className={`group/link inline-flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold focus-visible:ring-offset-2 ${
                       dark
                         ? "bg-brand-gold text-brand-navy hover:bg-[#D6B965] focus-visible:ring-offset-brand-navy"
@@ -166,7 +172,7 @@ export default function PortalsSection() {
                       aria-hidden="true"
                       className="shrink-0 transition-transform duration-200 group-hover/link:translate-x-1"
                     />
-                  </Link>
+                  </AuthAwareLink>
                 </div>
               </motion.article>
             );
@@ -182,8 +188,8 @@ export default function PortalsSection() {
 
           <span aria-hidden="true" className="hidden h-4 w-px bg-slate-200 sm:block" />
 
-          <Link
-            href="/auth/login"
+          <AuthAwareLink
+            fallbackHref="/auth/login"
             className="inline-flex items-center gap-2 text-sm font-bold text-brand-navy transition-colors hover:text-brand-blue"
           >
             Already have an account?
@@ -191,7 +197,7 @@ export default function PortalsSection() {
               Sign in
             </span>
             <ArrowUpRight size={14} aria-hidden="true" />
-          </Link>
+          </AuthAwareLink>
         </div>
       </div>
     </section>

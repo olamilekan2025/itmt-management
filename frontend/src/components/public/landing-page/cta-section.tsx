@@ -9,6 +9,8 @@ import {
   WalletCards,
 } from "lucide-react";
 
+import AuthAwareLink from "@/components/shared/auth-aware-link";
+
 const roles = [
   { label: "Students", icon: GraduationCap },
   { label: "Lecturers", icon: BookOpen },
@@ -53,8 +55,8 @@ export default function CtaSection() {
 
           {/* Actions */}
           <div className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-            <Link
-              href="/auth/login"
+            <AuthAwareLink
+              fallbackHref="/auth/login"
               className="group inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-brand-gold px-7 text-sm font-semibold text-brand-navy shadow-[0_12px_30px_-12px_rgba(200,169,81,0.7)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#D6B965] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold focus-visible:ring-offset-2 focus-visible:ring-offset-brand-navy"
             >
               Access Your Portal
@@ -63,15 +65,15 @@ export default function CtaSection() {
                 aria-hidden="true"
                 className="transition-transform duration-200 group-hover:translate-x-1"
               />
-            </Link>
+            </AuthAwareLink>
 
-            <Link
-              href="/auth/login"
+            <AuthAwareLink
+              fallbackHref="/auth/login"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/[0.06] px-7 text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-white/40 hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-navy"
             >
               <LogIn size={16} aria-hidden="true" />
               Sign In
-            </Link>
+            </AuthAwareLink>
           </div>
 
           {/* Roles */}

@@ -60,10 +60,8 @@ export default function AboutPlatform() {
   const shouldReduceMotion = useReducedMotion();
 
   const reveal = {
-    initial: shouldReduceMotion
-      ? false
-      : { opacity: 0, y: 16 },
-    whileInView: { opacity: 1, y: 0 },
+    initial: false,
+    whileInView: shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 },
     viewport: { once: true, amount: 0.15 },
     transition: {
       duration: shouldReduceMotion ? 0 : 0.5,

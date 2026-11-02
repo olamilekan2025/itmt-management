@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
+import AuthAwareLink from "@/components/shared/auth-aware-link";
+
 interface Slide {
   _id: string;
   imageUrl: string;
@@ -160,15 +162,15 @@ export default function HeroSection() {
           </p>
 
           <div className="mt-9 flex flex-col items-stretch justify-center gap-4 sm:flex-row sm:items-center">
-            <Link
-              href="/auth/login"
+            <AuthAwareLink
+              fallbackHref="/auth/login"
               className="inline-flex min-h-12 items-center justify-center rounded-lg bg-[#f5c76a] px-7 py-3.5 text-sm font-bold text-[#101d32] shadow-lg transition-colors hover:bg-[#ffda8c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#101d32]"
             >
               Sign in to your dashboard
               <span className="ml-2" aria-hidden="true">
                 →
               </span>
-            </Link>
+            </AuthAwareLink>
 
             <a
               href="#offices"

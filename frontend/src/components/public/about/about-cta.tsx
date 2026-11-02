@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, UserPlus } from "lucide-react";
 
+import AuthAwareLink from "@/components/shared/auth-aware-link";
+
 export default function AboutCta() {
   return (
     <section className="bg-[#FFFFFF] py-20 sm:py-24 lg:py-28">
@@ -37,13 +39,13 @@ export default function AboutCta() {
               />
             </Link>
 
-            <Link
-              href="/auth/login"
+            <AuthAwareLink
+              fallbackHref="/auth/login"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/[0.06] px-7 text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-white/40 hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-navy"
             >
               <UserPlus size={16} aria-hidden="true" />
               Create Account
-            </Link>
+            </AuthAwareLink>
           </div>
         </div>
       </div>

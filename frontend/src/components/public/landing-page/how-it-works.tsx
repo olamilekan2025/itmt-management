@@ -61,7 +61,7 @@ export default function HowItWorks() {
       <div className="relative mx-auto max-w-7xl px-5 sm:px-8 lg:px-8">
         {/* Header */}
         <motion.div
-          initial={reduce ? false : { opacity: 0, y: 14 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={{ duration: reduce ? 0 : 0.5, ease }}

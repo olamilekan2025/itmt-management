@@ -75,7 +75,7 @@ export default function FeaturesSection() {
       <div className="relative mx-auto max-w-8xl px-5 sm:px-8 lg:px-10">
         {/* Header */}
         <motion.div
-          initial={reduce ? false : { opacity: 0, y: 12 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={{ duration: reduce ? 0 : 0.45, ease: "easeOut" }}
@@ -101,7 +101,7 @@ export default function FeaturesSection() {
             return (
               <motion.article
                 key={feature.title}
-                initial={reduce ? false : { opacity: 0, y: 12 }}
+                initial={false}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.15 }}
                 transition={{

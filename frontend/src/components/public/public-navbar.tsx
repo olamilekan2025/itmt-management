@@ -17,6 +17,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import LogoutConfirmModal from "@/components/common/logout-confirm-modal";
+import AuthAwareLink from "@/components/shared/auth-aware-link";
 import { logoutUser } from "@/lib/auth/sign-out";
 
 const navLinks = [
@@ -373,13 +374,13 @@ export default function PublicNavbar() {
               </div>
             ) : (
               <>
-                <Link
-                  href="/auth/login"
+                <AuthAwareLink
+                  fallbackHref="/auth/login"
                   className="group inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-navy transition-colors hover:bg-brand-light"
                 >
                   <LogIn className="h-4 w-4" />
                   Sign in
-                </Link>
+                </AuthAwareLink>
 
                 <Link
                   href="/admission-form/apply"
@@ -563,14 +564,14 @@ export default function PublicNavbar() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Link
-                      href="/auth/login"
+                    <AuthAwareLink
+                      fallbackHref="/auth/login"
                       onClick={closeMenus}
                       className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-brand-navy transition-colors hover:bg-brand-light"
                     >
                       <LogIn className="h-4 w-4" />
                       Sign in
-                    </Link>
+                    </AuthAwareLink>
 
                     <Link
                       href="/admission-form/apply"

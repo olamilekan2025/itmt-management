@@ -14,6 +14,7 @@ import { FormEvent, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { apiPost } from "@/lib/api";
+import AuthAwareLink from "@/components/shared/auth-aware-link";
 
 const quickLinks = [
   { href: "/about", label: "About" },
@@ -24,7 +25,7 @@ const quickLinks = [
 ];
 
 const studentLinks = [
-  { href: "/auth/student/login", label: "Student Login" },
+  { href: "/auth/student/login", label: "Student Login", isStudent: true },
   { href: "/auth/login", label: "Create Account" },
   { href: "/auth/forgot-password", label: "Forgot Password" },
 ];
@@ -96,7 +97,7 @@ function FooterLinkList({
   links,
 }: {
   title: string;
-  links: { href: string; label: string }[];
+  links: { href: string; label: string; isStudent?: boolean }[];
 }) {
   return (
     <nav aria-label={title}>
@@ -105,16 +106,31 @@ function FooterLinkList({
       <ul className="mt-4 space-y-2.5">
         {links.map((link) => (
           <li key={`${link.href}-${link.label}`}>
-            <Link
-              href={link.href}
-              className="group inline-flex items-center text-sm text-slate-400 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:text-white"
-            >
-              {link.label}
-              <ArrowUpRight
-                aria-hidden="true"
-                className="ml-1 h-3.5 w-3.5 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
-              />
-            </Link>
+            {link.isStudent ? (
+              <AuthAwareLink
+                fallbackHref={link.href}
+                studentHref={link.href}
+                studentLogin={link.isStudent}
+                className="group inline-flex items-center text-sm text-slate-400 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:text-white"
+              >
+                {link.label}
+                <ArrowUpRight
+                  aria-hidden="true"
+                  className="ml-1 h-3.5 w-3.5 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
+                />
+              </AuthAwareLink>
+            ) : (
+              <Link
+                href={link.href}
+                className="group inline-flex items-center text-sm text-slate-400 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:text-white"
+              >
+                {link.label}
+                <ArrowUpRight
+                  aria-hidden="true"
+                  className="ml-1 h-3.5 w-3.5 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
+                />
+              </Link>
+            )}
           </li>
         ))}
       </ul>
